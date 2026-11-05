@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="blueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0066FF"/>
+      <stop offset="50%" stop-color="#0044CC"/>
+      <stop offset="100%" stop-color="#001F66"/>
+    </linearGradient>
+    <linearGradient id="swooshGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#33B5FF"/>
+      <stop offset="100%" stop-color="#0077FF"/>
+    </linearGradient>
+    <linearGradient id="silverGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#A0B0C0"/>
+    </linearGradient>
+  </defs>
+  
+  <!-- Rounded Background Container -->
+  <rect width="128" height="128" rx="28" fill="#001833"/>
+  <rect x="2" y="2" width="124" height="124" rx="26" fill="none" stroke="#0080FF" stroke-width="2" stroke-opacity="0.4"/>
+  
+  <!-- Stylized B Stem & Bowls -->
+  <path d="M28 22 h32 c16 0 28 8 28 22 c0 9 -5 16 -13 19 c11 3 17 11 17 21 c0 15 -13 24 -30 24 H28 Z" fill="url(#blueGrad)"/>
+  
+  <!-- Inner Cutouts -->
+  <path d="M44 34 h14 c8 0 14 4 14 11 s-6 11 -14 11 H44 Z" fill="#001833"/>
+  <path d="M44 72 h16 c9 0 16 4 16 12 s-7 12 -16 12 H44 Z" fill="#001833"/>
+  
+  <!-- Neoclassical Bank Pediment & Columns inside top bowl -->
+  <path d="M38 46 L51 38 L64 46 Z" fill="#FFFFFF"/>
+  <rect x="39" y="47" width="24" height="2" fill="#FFFFFF"/>
+  <rect x="42" y="49" width="3" height="12" fill="#FFFFFF"/>
+  <rect x="48" y="49" width="3" height="12" fill="#FFFFFF"/>
+  <rect x="54" y="49" width="3" height="12" fill="#FFFFFF"/>
+  <rect x="39" y="61" width="24" height="2" fill="#FFFFFF"/>
+  
+  <!-- Dynamic Swoosh across 'B' -->
+  <path d="M12 78 C30 84 62 82 88 56 C102 42 108 28 106 24 C104 22 98 25 88 36 C64 62 36 70 12 78 Z" fill="url(#swooshGrad)"/>
+  <path d="M14 84 C32 90 60 86 82 66 C70 78 44 84 14 84 Z" fill="url(#silverGrad)"/>
+</svg>

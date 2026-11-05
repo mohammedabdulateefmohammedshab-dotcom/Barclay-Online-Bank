@@ -1,0 +1,6 @@
+{
+  "name": "Barclay Online Bank",
+  "description": "Barclay Online Bank - Secure personal and business internet banking, international transfers, deposits, multi-tier accounts, cryptocurrency payments, and real-time management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,158 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Registered Barclay Online Bank customer profile",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10, "minLength": 10, "pattern": "^[0-9]{10}$" },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "surname": { "type": "string", "maxLength": 100 },
+        "email": { "type": "string", "maxLength": 150 },
+        "country": { "type": "string", "maxLength": 100 },
+        "pin": { "type": "string", "maxLength": 4, "minLength": 4 },
+        "balance": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "tier": { "type": "string", "enum": ["Tier 1", "Tier 2", "Tier 3"] },
+        "status": { "type": "string", "enum": ["active", "suspended", "pending"] },
+        "role": { "type": "string", "enum": ["user", "admin"] },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "accountNumber", "fullName", "surname", "email", "country", "pin", "balance", "tier"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transfer, deposit, or withdrawal record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal", "transfer", "crypto_payment", "tier_upgrade"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "status": { "type": "string", "enum": ["Pending", "Completed", "Reversed", "Cancelled"] },
+        "senderName": { "type": "string", "maxLength": 150 },
+        "recipientName": { "type": "string", "maxLength": 150 },
+        "recipientAccountNumber": { "type": "string", "maxLength": 50 },
+        "recipientBank": { "type": "string", "maxLength": 150 },
+        "recipientCountry": { "type": "string", "maxLength": 100 },
+        "swiftCode": { "type": "string", "maxLength": 20 },
+        "reference": { "type": "string", "maxLength": 100 },
+        "description": { "type": "string", "maxLength": 255 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "type", "amount", "status", "createdAt"]
+    },
+    "PaymentSubmission": {
+      "title": "PaymentSubmission",
+      "description": "Cryptocurrency or wire proof submission for admin review",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "userFullName": { "type": "string", "maxLength": 200 },
+        "method": { "type": "string", "enum": ["BTC", "USDT_ERC20", "Bank_Wire"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "txHashOrRef": { "type": "string", "maxLength": 200 },
+        "walletAddress": { "type": "string", "maxLength": 200 },
+        "proofImageUrl": { "type": "string", "maxLength": 500000 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Cancelled"] },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "accountNumber", "method", "amount", "status", "createdAt"]
+    },
+    "VerificationRequest": {
+      "title": "VerificationRequest",
+      "description": "Tier 2 facial verification or Tier 3 government ID verification submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "fullName": { "type": "string", "maxLength": 200 },
+        "targetTier": { "type": "string", "enum": ["Tier 2", "Tier 3"] },
+        "verificationType": { "type": "string", "enum": ["facial", "government_id"] },
+        "documentType": { "type": "string", "maxLength": 50 },
+        "documentNumber": { "type": "string", "maxLength": 100 },
+        "mediaUrl": { "type": "string", "maxLength": 500000 },
+        "feePaid": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending Review", "Approved", "Rejected"] },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "accountNumber", "targetTier", "verificationType", "status", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Real-time user alerts, transaction approvals, and admin notices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "title": { "type": "string", "maxLength": 150 },
+        "message": { "type": "string", "maxLength": 1000 },
+        "type": { "type": "string", "enum": ["info", "success", "warning", "transaction", "verification", "security"] },
+        "read": { "type": "boolean" },
+        "relatedId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "title", "message", "type", "read", "createdAt"]
+    },
+    "FinancialSettings": {
+      "title": "FinancialSettings",
+      "description": "Configurable global bank settings, limits, fees, and cryptocurrency addresses",
+      "type": "object",
+      "properties": {
+        "verificationFee": { "type": "number" },
+        "tier2UpgradeFee": { "type": "number" },
+        "tier3UpgradeFee": { "type": "number" },
+        "tier1DailyLimit": { "type": "number" },
+        "tier1MonthlyLimit": { "type": "number" },
+        "tier2DailyLimit": { "type": "number" },
+        "tier2MonthlyLimit": { "type": "number" },
+        "tier3DailyLimit": { "type": "number" },
+        "tier3MonthlyLimit": { "type": "number" },
+        "btcAddress": { "type": "string", "maxLength": 200 },
+        "usdtAddress": { "type": "string", "maxLength": 200 },
+        "requireSwiftCode": { "type": "boolean" },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["tier2UpgradeFee", "tier3UpgradeFee", "tier2DailyLimit", "tier2MonthlyLimit", "btcAddress", "usdtAddress"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Barclay user bank profiles"
+    },
+    "/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Bank transfers, deposits, withdrawals, and ledger items"
+    },
+    "/payment_submissions/{submissionId}": {
+      "schema": "PaymentSubmission",
+      "description": "Cryptocurrency and wire proof submissions"
+    },
+    "/verification_requests/{requestId}": {
+      "schema": "VerificationRequest",
+      "description": "Tier 2 and Tier 3 KYC and identity verification documents"
+    },
+    "/notifications/{notificationId}": {
+      "schema": "Notification",
+      "description": "User notification messages"
+    },
+    "/settings/financial": {
+      "schema": "FinancialSettings",
+      "description": "Global bank parameters, fees, limits, and crypto wallets"
+    }
+  }
+}
