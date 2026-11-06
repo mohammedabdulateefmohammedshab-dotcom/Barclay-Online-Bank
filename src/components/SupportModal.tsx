@@ -11,6 +11,7 @@ import {
   Lock,
   CheckCircle2
 } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
 
 interface SupportModalProps {
   isOpen: boolean;
@@ -88,13 +89,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#002b52] flex items-center justify-between bg-[#001428]">
           <div className="flex items-center gap-3">
-            <div className="bg-white/95 px-2 py-1 rounded-xl shadow-md border border-cyan-400/40">
-              <img
-                src="/logo.png"
-                alt="Barclay Online Bank"
-                className="h-9 w-auto object-contain select-none"
-              />
-            </div>
+            <BrandLogo variant="horizontal" size="sm" />
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-sm font-extrabold text-white">Barclay Online Client Support</h3>

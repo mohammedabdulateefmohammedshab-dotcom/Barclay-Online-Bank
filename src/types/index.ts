@@ -12,6 +12,39 @@ export type VerificationType = 'facial' | 'government_id';
 
 export type VerificationStatus = 'Pending Review' | 'Approved' | 'Rejected';
 
+export type CardStatus = 'active' | 'inactive' | 'frozen' | 'blocked';
+
+export interface CardLimits {
+  onlinePayments: boolean;
+  internationalUsage: boolean;
+  atmWithdrawals: boolean;
+  contactless: boolean;
+}
+
+export interface CardDetails {
+  id: string;
+  cardNumber: string; // 16 digits
+  cvv: string; // 3 digits
+  expiryDate: string; // MM/YY
+  cardholderName?: string;
+  cardHolder?: string;
+  cardType: string;
+  brand?: string;
+  status: CardStatus;
+  spendingLimit?: number;
+  dailyLimit?: number;
+  monthlyLimit?: number;
+  onlineTransactions?: boolean;
+  internationalTransactions?: boolean;
+  atmWithdrawals?: boolean;
+  contactless?: boolean;
+  activationCode?: string;
+  issuer?: string;
+  issuerName?: string;
+  issuedAt?: string;
+  limits?: CardLimits;
+}
+
 export interface UserProfile {
   uid: string;
   accountNumber: string; // Exactly 10 digits
@@ -30,6 +63,7 @@ export interface UserProfile {
   updatedAt: string;
   swiftVerificationCode?: string; // 4-digit code
   swiftVerified?: boolean;
+  card?: CardDetails;
 }
 
 export interface BankTransaction {

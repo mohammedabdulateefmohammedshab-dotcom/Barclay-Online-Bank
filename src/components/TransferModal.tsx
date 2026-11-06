@@ -17,6 +17,7 @@ import {
 import { UserProfile, FinancialSettings, BankTransaction } from '../types';
 import { SUPPORTED_COUNTRIES } from '../lib/banksData';
 import { store } from '../lib/store';
+import { BrandLogo } from './BrandLogo';
 
 interface TransferModalProps {
   isOpen: boolean;
@@ -134,13 +135,7 @@ export const TransferModal: React.FC<TransferModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#002b52] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-white/95 px-2 py-1 rounded-xl shadow-md border border-cyan-400/40">
-              <img
-                src="/logo.png"
-                alt="Barclay Online Bank"
-                className="h-8 w-auto object-contain select-none"
-              />
-            </div>
+            <BrandLogo variant="horizontal" size="sm" />
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
                 International & Domestic Wire

@@ -6,3 +6,10 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Chat attachments and media
+public/assets/
+*.mp4
+*.mov
+*.webm
+*.avi

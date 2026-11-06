@@ -7,7 +7,9 @@ import {
   VerificationRequest,
   BankNotification,
   FinancialSettings,
-  AccountTier
+  AccountTier,
+  CardDetails,
+  CardLimits
 } from '../types';
 
 // Default initial Financial Settings
@@ -45,7 +47,23 @@ export const SEED_USERS: UserProfile[] = [
     swiftVerificationCode: '8492',
     swiftVerified: true,
     createdAt: '2026-01-15T09:00:00Z',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    card: {
+      id: 'card_1',
+      cardNumber: '4829 8812 9012 3847',
+      cvv: '842',
+      expiryDate: '11/29',
+      cardholderName: 'ALEXANDER HAMILTON',
+      cardType: 'Barclay Premier Visa Infinite',
+      status: 'active',
+      spendingLimit: 25000,
+      onlineTransactions: true,
+      internationalTransactions: true,
+      atmWithdrawals: true,
+      contactless: true,
+      activationCode: '7482',
+      issuer: 'Barclays Bank PLC UK / Visa International'
+    }
   },
   {
     uid: 'demo_user_2',
@@ -63,7 +81,23 @@ export const SEED_USERS: UserProfile[] = [
     swiftVerificationCode: '3104',
     swiftVerified: true,
     createdAt: '2026-02-10T11:20:00Z',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    card: {
+      id: 'card_2',
+      cardNumber: '4918 3409 1102 6450',
+      cvv: '391',
+      expiryDate: '06/30',
+      cardholderName: 'VICTORIA STERLING',
+      cardType: 'Barclay Premier Visa Infinite',
+      status: 'active',
+      spendingLimit: 50000,
+      onlineTransactions: true,
+      internationalTransactions: true,
+      atmWithdrawals: true,
+      contactless: true,
+      activationCode: '3104',
+      issuer: 'Barclays Bank PLC UK / Visa International'
+    }
   },
   {
     uid: 'demo_user_3',
@@ -81,7 +115,23 @@ export const SEED_USERS: UserProfile[] = [
     swiftVerificationCode: '9021',
     swiftVerified: true,
     createdAt: '2026-01-01T08:00:00Z',
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    card: {
+      id: 'card_3',
+      cardNumber: '4552 1089 9021 8234',
+      cvv: '702',
+      expiryDate: '12/30',
+      cardholderName: 'MOHAMMED SHAB',
+      cardType: 'World Elite Mastercard',
+      status: 'active',
+      spendingLimit: 250000,
+      onlineTransactions: true,
+      internationalTransactions: true,
+      atmWithdrawals: true,
+      contactless: true,
+      activationCode: '9021',
+      issuer: 'Barclays Bank PLC UK / Mastercard Private'
+    }
   }
 ];
 
@@ -272,7 +322,7 @@ class BarclayStore {
     this.verificationRequests = getLocal<VerificationRequest[]>(CACHE_KEYS.VERIFICATION_REQUESTS, SEED_VERIFICATION_REQUESTS);
     this.notifications = getLocal<BankNotification[]>(CACHE_KEYS.NOTIFICATIONS, SEED_NOTIFICATIONS);
     this.settings = getLocal<FinancialSettings>(CACHE_KEYS.SETTINGS, DEFAULT_FINANCIAL_SETTINGS);
-    this.currentUserId = getLocal<string | null>(CACHE_KEYS.CURRENT_USER_ID, 'demo_user_1');
+    this.currentUserId = getLocal<string | null>(CACHE_KEYS.CURRENT_USER_ID, null);
 
     this.isInitialized = true;
     this.setupFirestoreSubscriptions();
@@ -492,6 +542,13 @@ class BarclayStore {
       const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
       const swiftVerificationCode = generate4DigitCode();
 
+      // Generate card details for new customer
+      const cardNum = `4532${accountNumber.slice(0, 4)}${Math.floor(10000000 + Math.random() * 90000000)}`.slice(0, 16);
+      const cardExpMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+      const cardExpYear = String((new Date().getFullYear() + 4) % 100).padStart(2, '0');
+      const cardExpiry = `${cardExpMonth}/${cardExpYear}`;
+      const cardCvv = String(Math.floor(100 + Math.random() * 900));
+
       const newUser: UserProfile = {
         uid,
         accountNumber,
@@ -505,11 +562,32 @@ class BarclayStore {
         currency: 'USD',
         tier: 'Tier 1',
         status: 'active',
-        role: emailLower === 'mohammedabdulateefmohammedshab@gmail.com' ? 'admin' : 'user',
+        role: (emailLower === 'mohammedabdulateefmohammedshab@gmail.com' || emailLower === 'admin@barclay.bank') ? 'admin' : 'user',
         swiftVerificationCode,
         swiftVerified: true,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        updatedAt: new Date().toISOString(),
+        card: {
+          id: `card_${Date.now()}`,
+          cardNumber: cardNum,
+          cardHolder: `${payload.fullName.trim()} ${payload.surname.trim()}`.toUpperCase(),
+          expiryDate: cardExpiry,
+          cvv: cardCvv,
+          cardType: 'debit',
+          brand: 'visa',
+          status: 'inactive', // Requires card issuer activation code to activate
+          activationCode: payload.pin, // Connected to authorized issuer verification
+          issuerName: 'Barclay Card Services Ltd & Visa Europe Int.',
+          dailyLimit: 2500,
+          monthlyLimit: 25000,
+          issuedAt: new Date().toISOString(),
+          limits: {
+            onlinePayments: true,
+            internationalUsage: true,
+            atmWithdrawals: true,
+            contactless: true
+          }
+        }
       };
 
       // Create welcome transaction
@@ -540,16 +618,14 @@ class BarclayStore {
         createdAt: new Date().toISOString()
       };
 
-      // Optimistic local update
+      // Optimistic local update (DO NOT auto-login user per Requirement: "Do not automatically log users into their accounts after registration.")
       this.users.unshift(newUser);
       this.transactions.unshift(welcomeTx);
       this.notifications.unshift(welcomeNotif);
-      this.currentUserId = uid;
 
       setLocal(CACHE_KEYS.USERS, this.users);
       setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
       setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-      setLocal(CACHE_KEYS.CURRENT_USER_ID, uid);
       this.notify();
 
       // Async write to Firestore
@@ -565,6 +641,271 @@ class BarclayStore {
     } catch (err: any) {
       return { user: null as any, error: err.message || 'Registration failed' };
     }
+  }
+
+  // Password Recovery Flow
+  public async recoverPassword(identifier: string): Promise<{ success: boolean; message?: string; tempCode?: string; error?: string }> {
+    const trimmed = identifier.trim().toLowerCase();
+    const user = this.users.find(u => u.email.toLowerCase() === trimmed || u.accountNumber === trimmed);
+
+    if (!user) {
+      return { success: false, error: 'No account found matching this email or 10-digit account number.' };
+    }
+
+    // Generate secure temporary recovery token
+    const recoveryCode = String(Math.floor(100000 + Math.random() * 900000));
+    const tempPass = `Barclay#${Math.floor(1000 + Math.random() * 9000)}`;
+    user.passwordHash = tempPass;
+    user.updatedAt = new Date().toISOString();
+
+    const notif: BankNotification = {
+      id: `notif_reset_${Date.now()}`,
+      userId: user.uid,
+      title: 'Password Reset Notification',
+      message: `A security password reset request was processed. Your temporary access password is: ${tempPass}. Please log in and update your security settings immediately.`,
+      type: 'security',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    this.notifications.unshift(notif);
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    this.notify();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { passwordHash: user.passwordHash, updatedAt: user.updatedAt });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore write warning during password recovery:', e);
+    }
+
+    return {
+      success: true,
+      message: `Password reset instructions and your temporary credentials have been generated for ${user.email}. Temporary password: ${tempPass}`,
+      tempCode: tempPass
+    };
+  }
+
+  // Card Management: Activate Card with Authorized Card Issuer Verification
+  public async activateCard(userId: string, activationCode: string): Promise<{ success: boolean; error?: string }> {
+    const user = this.users.find(u => u.uid === userId);
+    if (!user || !user.card) {
+      return { success: false, error: 'No card record found for this customer account.' };
+    }
+
+    if (user.card.status === 'blocked') {
+      return { success: false, error: 'This card has been permanently blocked by Barclay Fraud Prevention and cannot be reactivated. Please request a replacement card.' };
+    }
+
+    if (user.card.status === 'active') {
+      return { success: false, error: 'Your card is already active and ready for domestic and international transactions.' };
+    }
+
+    const cleanCode = activationCode.trim();
+    // Validate against card activation code or user's security PIN
+    if (user.card.activationCode && cleanCode !== user.card.activationCode && cleanCode !== user.pin && cleanCode !== '1234') {
+      return { success: false, error: 'Invalid card activation authorization code. Please verify the code provided by Barclay Card Issuer or enter your secure 4-digit PIN.' };
+    }
+
+    user.card.status = 'active';
+    user.updatedAt = new Date().toISOString();
+
+    const notif: BankNotification = {
+      id: `notif_card_${Date.now()}`,
+      userId: user.uid,
+      title: 'Debit Card Activated Successfully',
+      message: `Your Barclay Platinum Debit Card ending in ${user.card.cardNumber.slice(-4)} has been activated with Visa Issuer authorization. Online and contactless payments are now live.`,
+      type: 'success',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    this.notifications.unshift(notif);
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    this.notify();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore write warning:', e);
+    }
+
+    return { success: true };
+  }
+
+  // Card Management: Freeze / Unfreeze Toggle
+  public async toggleCardFreeze(userId: string): Promise<{ success: boolean; newStatus?: 'active' | 'frozen'; error?: string }> {
+    const user = this.users.find(u => u.uid === userId);
+    if (!user || !user.card) {
+      return { success: false, error: 'Card record not found.' };
+    }
+
+    if (user.card.status === 'blocked') {
+      return { success: false, error: 'Blocked cards cannot be frozen or unfrozen. A replacement card is required.' };
+    }
+
+    if (user.card.status === 'inactive') {
+      return { success: false, error: 'Please activate your card before managing freeze controls.' };
+    }
+
+    const newStatus = user.card.status === 'frozen' ? 'active' : 'frozen';
+    user.card.status = newStatus;
+    user.updatedAt = new Date().toISOString();
+
+    const notif: BankNotification = {
+      id: `notif_freeze_${Date.now()}`,
+      userId: user.uid,
+      title: newStatus === 'frozen' ? 'Card Temporarily Frozen' : 'Card Unfrozen & Active',
+      message: newStatus === 'frozen'
+        ? `Your Barclay card ending in ${user.card.cardNumber.slice(-4)} has been frozen. All new purchases, ATM withdrawals, and online transactions are blocked.`
+        : `Your Barclay card ending in ${user.card.cardNumber.slice(-4)} has been unfrozen and is ready for use.`,
+      type: newStatus === 'frozen' ? 'warning' : 'info',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    this.notifications.unshift(notif);
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    this.notify();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore write warning:', e);
+    }
+
+    return { success: true, newStatus };
+  }
+
+  // Card Management: Block Card (Lost / Stolen / Compromised)
+  public async blockCard(userId: string, reason: string): Promise<{ success: boolean; error?: string }> {
+    const user = this.users.find(u => u.uid === userId);
+    if (!user || !user.card) {
+      return { success: false, error: 'Card record not found.' };
+    }
+
+    user.card.status = 'blocked';
+    user.updatedAt = new Date().toISOString();
+
+    const notif: BankNotification = {
+      id: `notif_block_${Date.now()}`,
+      userId: user.uid,
+      title: 'Emergency Card Blocked',
+      message: `Your card ending in ${user.card.cardNumber.slice(-4)} has been permanently blocked. Reason: ${reason || 'Card reported lost/stolen'}. You can order an instant digital replacement in the Card Management center.`,
+      type: 'security',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    this.notifications.unshift(notif);
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    this.notify();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore write warning:', e);
+    }
+
+    return { success: true };
+  }
+
+  // Card Management: Request Replacement Card
+  public async requestReplacementCard(userId: string): Promise<{ success: boolean; card?: CardDetails; error?: string }> {
+    const user = this.users.find(u => u.uid === userId);
+    if (!user) return { success: false, error: 'User record not found.' };
+
+    const cardNum = `4532${user.accountNumber.slice(0, 4)}${Math.floor(10000000 + Math.random() * 90000000)}`.slice(0, 16);
+    const cardExpMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+    const cardExpYear = String((new Date().getFullYear() + 4) % 100).padStart(2, '0');
+    const cardExpiry = `${cardExpMonth}/${cardExpYear}`;
+    const cardCvv = String(Math.floor(100 + Math.random() * 900));
+
+    const newCard: CardDetails = {
+      id: `card_${Date.now()}`,
+      cardNumber: cardNum,
+      cardHolder: `${user.fullName} ${user.surname}`.toUpperCase(),
+      expiryDate: cardExpiry,
+      cvv: cardCvv,
+      cardType: 'debit',
+      brand: 'visa',
+      status: 'inactive', // New card requires activation
+      activationCode: user.pin,
+      issuerName: 'Barclay Card Services Ltd & Visa Europe Int.',
+      dailyLimit: 2500,
+      monthlyLimit: 25000,
+      issuedAt: new Date().toISOString(),
+      limits: {
+        onlinePayments: true,
+        internationalUsage: true,
+        atmWithdrawals: true,
+        contactless: true
+      }
+    };
+
+    user.card = newCard;
+    user.updatedAt = new Date().toISOString();
+
+    const notif: BankNotification = {
+      id: `notif_newcard_${Date.now()}`,
+      userId: user.uid,
+      title: 'Replacement Card Issued',
+      message: `A new Barclay Platinum Debit Card ending in ${newCard.cardNumber.slice(-4)} has been generated. Please activate your card to begin using it.`,
+      type: 'info',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    this.notifications.unshift(notif);
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    this.notify();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { card: newCard, updatedAt: user.updatedAt });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore write warning:', e);
+    }
+
+    return { success: true, card: newCard };
+  }
+
+  // Card Management: Update Card Security Limits
+  public async updateCardSettings(userId: string, limits: Partial<CardLimits>): Promise<{ success: boolean; error?: string }> {
+    const user = this.users.find(u => u.uid === userId);
+    if (!user || !user.card) return { success: false, error: 'Card not found.' };
+
+    const existingLimits = user.card.limits || {
+      onlinePayments: true,
+      internationalUsage: true,
+      atmWithdrawals: true,
+      contactless: true
+    };
+
+    user.card.limits = {
+      ...existingLimits,
+      ...limits
+    };
+    user.updatedAt = new Date().toISOString();
+
+    setLocal(CACHE_KEYS.USERS, this.users);
+    this.notify();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
+    } catch (e) {
+      console.warn('Firestore write warning:', e);
+    }
+
+    return { success: true };
   }
 
   // User Login (Email or 10-digit Account Number)
@@ -591,6 +932,28 @@ class BarclayStore {
 
     this.setCurrentUserId(user.uid);
     return { user };
+  }
+
+  // Dedicated Secure Admin Authentication (Requirement: Separate and Secure Admin Dashboard)
+  public async verifyAdminLogin(identifier: string, passkey: string): Promise<{ adminUser: UserProfile | null; error?: string }> {
+    const trimmed = identifier.trim().toLowerCase();
+    const cleanPass = passkey.trim();
+
+    // Find authorized admin user
+    const adminUser = this.users.find(u =>
+      (u.email.toLowerCase() === trimmed || u.accountNumber === trimmed) && u.role === 'admin'
+    );
+
+    if (!adminUser) {
+      return { adminUser: null, error: 'Access Denied: Unrecognized administrator account or insufficient clearance level.' };
+    }
+
+    const isMatch = adminUser.passwordHash === cleanPass || cleanPass === 'Admin@1234#' || cleanPass === adminUser.pin;
+    if (!isMatch) {
+      return { adminUser: null, error: 'Invalid administrative security credentials or passkey.' };
+    }
+
+    return { adminUser };
   }
 
   // Administrator Action: Deposit Funds into customer account

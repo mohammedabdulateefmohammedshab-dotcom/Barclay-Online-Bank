@@ -12,6 +12,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { BankTransaction } from '../types';
+import { BrandLogo } from './BrandLogo';
 
 interface TransactionReceiptModalProps {
   transaction: BankTransaction | null;
@@ -114,11 +115,7 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
           {/* Official Bank Header */}
           <div className="flex items-start justify-between border-b-2 border-slate-900 pb-5">
             <div className="flex items-center gap-4">
-              <img
-                src="/logo.png"
-                alt="Barclay Online Bank"
-                className="h-14 sm:h-16 w-auto object-contain select-none"
-              />
+              <BrandLogo variant="horizontal" size="md" />
               <div className="border-l border-slate-300 pl-4">
                 <p className="text-xs text-slate-700 font-bold">
                   Head Office: 1 Churchill Place, Canary Wharf, London E14 5HP, UK

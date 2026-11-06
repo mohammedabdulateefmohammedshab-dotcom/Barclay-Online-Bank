@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { BankNotification } from '../types';
 import { store } from '../lib/store';
+import { BrandLogo } from './BrandLogo';
 
 interface NotificationsModalProps {
   isOpen: boolean;
@@ -58,13 +59,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#002b52] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="bg-white/95 px-2 py-1 rounded-xl shadow-md border border-cyan-400/40">
-              <img
-                src="/logo.png"
-                alt="Barclay Online Bank"
-                className="h-8 w-auto object-contain select-none"
-              />
-            </div>
+            <BrandLogo variant="horizontal" size="sm" />
             <div>
               <h3 className="text-sm font-extrabold text-white">Account Notifications</h3>
               <p className="text-[10px] text-cyan-300">Real-time alerts, transfer statuses & compliance notices</p>

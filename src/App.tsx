@@ -14,6 +14,7 @@ import { HomePage } from './components/HomePage';
 import { UserDashboard } from './components/UserDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
+import { AdminAuthModal } from './components/AdminAuthModal';
 import { DepositModal } from './components/DepositModal';
 import { TransferModal } from './components/TransferModal';
 import { WithdrawalModal } from './components/WithdrawalModal';
@@ -34,14 +35,15 @@ export default function App() {
   const [notifications, setNotifications] = useState<BankNotification[]>(store.getNotifications());
   const [settings, setSettings] = useState<FinancialSettings>(store.getSettings());
 
-  // Navigation & View Mode
-  const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>('dashboard');
+  // Navigation & View Mode: REQUIREMENT 2: When someone clicks the website link, they MUST land directly on the public homepage!
+  const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>('home');
   const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
   const [currentLang, setCurrentLang] = useState<SupportedLanguage>('en');
 
   // Modals state
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register'>('login');
+  const [adminAuthModalOpen, setAdminAuthModalOpen] = useState(false);
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
   const [withdrawalModalOpen, setWithdrawalModalOpen] = useState(false);
@@ -77,7 +79,7 @@ export default function App() {
 
   const unreadCount = userNotifications.filter(n => !n.read).length;
 
-  const handleOpenAuth = (mode: 'login' | 'register') => {
+  const handleOpenAuth = (mode: 'login' | 'register' | 'forgot') => {
     setAuthInitialMode(mode);
     setAuthModalOpen(true);
   };
@@ -89,10 +91,6 @@ export default function App() {
     setIsAdminMode(false);
   };
 
-  const handleToggleAdminView = () => {
-    setIsAdminMode(!isAdminMode);
-  };
-
   const handleTransferCreated = (tx: BankTransaction) => {
     setSelectedReceiptTx(tx);
   };
@@ -102,16 +100,16 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#00172e] font-sans antialiased text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-slate-950">
+    <div className="min-h-screen bg-[#0A192F] font-sans antialiased text-slate-100 flex flex-col selection:bg-blue-500 selection:text-white">
       
       {/* Universal Header */}
       <Header
         currentUser={currentUser}
         isAdminMode={isAdminMode}
         onOpenAuth={handleOpenAuth}
-        onOpenAdminAuth={() => setIsAdminMode(true)}
+        onOpenAdminAuth={() => setAdminAuthModalOpen(true)}
         onLogout={handleLogout}
-        onToggleAdminView={handleToggleAdminView}
+        onToggleAdminView={() => {}}
         unreadNotificationsCount={unreadCount}
         onOpenNotifications={() => setNotificationsModalOpen(true)}
         currentLang={currentLang}
@@ -128,7 +126,7 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1">
         {isAdminMode ? (
-          /* Separate Secure Admin Dashboard (Requirement 3 & 10) */
+          /* Separate Secure Admin Dashboard (Requirement 3 & 4: Only authorized administrators) */
           <AdminDashboard
             users={users}
             transactions={transactions}
@@ -136,10 +134,13 @@ export default function App() {
             verificationRequests={verificationRequests}
             settings={settings}
             onViewReceipt={(tx) => setSelectedReceiptTx(tx)}
-            onExitAdmin={() => setIsAdminMode(false)}
+            onExitAdmin={() => {
+              setIsAdminMode(false);
+              setActiveTab('home');
+            }}
           />
         ) : currentUser && activeTab === 'dashboard' ? (
-          /* Registered User Dashboard (Requirement 2) */
+          /* Registered User Dashboard (Requirement 2 & 5) */
           <UserDashboard
             currentUser={currentUser}
             transactions={userTransactions}
@@ -153,10 +154,10 @@ export default function App() {
             onOpenSupport={() => setSupportModalOpen(true)}
           />
         ) : (
-          /* Website Homepage (Requirement 1) */
+          /* Website Public Homepage (Requirement 1 & 2: First landing screen) */
           <HomePage
             onOpenAuth={handleOpenAuth}
-            onOpenAdminAuth={() => setIsAdminMode(true)}
+            onOpenAdminAuth={() => setAdminAuthModalOpen(true)}
             onOpenAbout={() => setAboutModalOpen(true)}
             onOpenSupport={() => setSupportModalOpen(true)}
             currentLang={currentLang}
@@ -164,7 +165,7 @@ export default function App() {
         )}
       </main>
 
-      {/* Modal Dialogs */}
+      {/* User Login & Registration Modal */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
@@ -173,6 +174,15 @@ export default function App() {
           store.setCurrentUserId(user.uid);
           setCurrentUser(user);
           setActiveTab('dashboard');
+        }}
+      />
+
+      {/* Dedicated Administrative Access Gateway (Requirement 4) */}
+      <AdminAuthModal
+        isOpen={adminAuthModalOpen}
+        onClose={() => setAdminAuthModalOpen(false)}
+        onSuccess={() => {
+          setIsAdminMode(true);
         }}
       />
 

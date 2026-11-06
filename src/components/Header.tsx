@@ -1,20 +1,21 @@
 import React, { useState } from 'react';
 import { 
-  Building2, 
   ShieldCheck, 
-  Globe, 
-  Bell, 
-  User, 
-  LogOut, 
   ChevronDown, 
   Lock, 
   LayoutDashboard, 
   CreditCard,
   Headphones,
-  Check
+  Check,
+  LogOut,
+  Bell,
+  Menu,
+  X,
+  Compass
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { LANGUAGES, SupportedLanguage, TRANSLATIONS } from '../lib/languages';
+import { BrandLogo } from './BrandLogo';
 
 interface HeaderProps {
   currentUser: UserProfile | null;
@@ -39,7 +40,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuth,
   onOpenAdminAuth,
   onLogout,
-  onToggleAdminView,
   unreadNotificationsCount,
   onOpenNotifications,
   currentLang,
@@ -51,120 +51,122 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const t = TRANSLATIONS[currentLang] || TRANSLATIONS.en;
 
   const currentLangObj = LANGUAGES.find(l => l.code === currentLang) || LANGUAGES[0];
 
+  const handleNavClick = (tab: string) => {
+    if (onSelectTab) onSelectTab(tab);
+    setMobileMenuOpen(false);
+  };
+
   return (
-    <header className="sticky top-0 z-40 bg-[#001f3f] text-white border-b border-[#003366] shadow-lg">
+    <header className="sticky top-0 z-40 bg-[#0A192F]/95 backdrop-blur-md text-white border-b border-[#1E293B] shadow-xl">
       {/* Top security bar */}
-      <div className="bg-[#001428] px-4 py-1.5 text-xs text-slate-300 flex justify-between items-center border-b border-[#002447]">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-3.5 h-3.5 text-cyan-400" />
-          <span className="font-medium tracking-wide">Barclay Online Banking Portal</span>
-          <span className="hidden md:inline text-slate-400">| 256-Bit TLS Military Grade Encryption</span>
-          <span className="hidden lg:inline text-emerald-400 font-semibold">• Systems Online & Synchronized</span>
-        </div>
-
-        <div className="flex items-center gap-4">
-          {/* Language Switcher */}
-          <div className="relative">
-            <button
-              onClick={() => setLangMenuOpen(!langMenuOpen)}
-              className="flex items-center gap-1.5 text-xs text-slate-200 hover:text-white bg-[#002850] px-2.5 py-1 rounded border border-[#003d73] transition-colors"
-              title="Change Language & Translation"
-            >
-              <span>{currentLangObj.flag}</span>
-              <span className="font-medium">{currentLangObj.native}</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
-
-            {langMenuOpen && (
-              <div 
-                className="absolute right-0 mt-1 w-44 bg-[#001b33] border border-[#003d73] rounded shadow-xl py-1 z-50 text-xs"
-                onMouseLeave={() => setLangMenuOpen(false)}
-              >
-                <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400 border-b border-[#002b52]">
-                  Select Language
-                </div>
-                {LANGUAGES.map(lang => (
-                  <button
-                    key={lang.code}
-                    onClick={() => {
-                      onChangeLang(lang.code);
-                      setLangMenuOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-[#002b52] transition-colors ${
-                      currentLang === lang.code ? 'text-cyan-400 font-semibold bg-[#002242]' : 'text-slate-200'
-                    }`}
-                  >
-                    <span className="flex items-center gap-2">
-                      <span>{lang.flag}</span>
-                      <span>{lang.native}</span>
-                    </span>
-                    {currentLang === lang.code && <Check className="w-3.5 h-3.5 text-cyan-400" />}
-                  </button>
-                ))}
-              </div>
-            )}
+      <div className="bg-[#071324] px-4 py-1.5 text-xs text-slate-300 flex justify-between items-center border-b border-[#14233D]">
+        <div className="max-w-7xl mx-auto w-full flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-blue-400" />
+            <span className="font-semibold tracking-wide text-white">Barclay Online Banking</span>
+            <span className="hidden md:inline text-slate-400">| 256-Bit TLS End-to-End Encryption</span>
+            <span className="hidden lg:inline text-emerald-400 font-semibold">• Core Banking Real-Time Sync</span>
           </div>
 
-          <button 
-            onClick={onOpenSupport}
-            className="hidden sm:flex items-center gap-1 text-slate-300 hover:text-cyan-300 transition-colors"
-          >
-            <Headphones className="w-3.5 h-3.5 text-cyan-400" />
-            <span>24/7 Helpline</span>
-          </button>
+          <div className="flex items-center gap-4">
+            {/* Language Switcher */}
+            <div className="relative">
+              <button
+                onClick={() => setLangMenuOpen(!langMenuOpen)}
+                className="flex items-center gap-1.5 text-xs text-slate-200 hover:text-white bg-[#0F223D] px-2.5 py-1 rounded-lg border border-[#1E3A5F] transition-colors"
+                title="Change Language & Translation"
+              >
+                <span>{currentLangObj.flag}</span>
+                <span className="font-medium hidden sm:inline">{currentLangObj.native}</span>
+                <ChevronDown className="w-3 h-3 text-slate-400" />
+              </button>
+
+              {langMenuOpen && (
+                <div 
+                  className="absolute right-0 mt-1 w-44 bg-[#0A192F] border border-[#1E3A5F] rounded-xl shadow-2xl py-1 z-50 text-xs"
+                  onMouseLeave={() => setLangMenuOpen(false)}
+                >
+                  <div className="px-3 py-1 text-[10px] uppercase font-bold text-slate-400 border-b border-[#1E293B]">
+                    Select Language
+                  </div>
+                  {LANGUAGES.map(lang => (
+                    <button
+                      key={lang.code}
+                      onClick={() => {
+                        onChangeLang(lang.code);
+                        setLangMenuOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-1.5 text-left hover:bg-[#0F223D] transition-colors ${
+                        currentLang === lang.code ? 'text-blue-400 font-semibold bg-[#0F223D]' : 'text-slate-200'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{lang.flag}</span>
+                        <span>{lang.native}</span>
+                      </span>
+                      {currentLang === lang.code && <Check className="w-3.5 h-3.5 text-blue-400" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button 
+              onClick={onOpenSupport}
+              className="hidden sm:flex items-center gap-1 text-slate-300 hover:text-blue-400 transition-colors"
+            >
+              <Headphones className="w-3.5 h-3.5 text-blue-400" />
+              <span>24/7 Support</span>
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Main Navigation Bar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 flex items-center justify-between">
-        {/* Brand Logo */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+        {/* Brand Logo - Native Scalable Vector, Seamless on #0A192F */}
         <div 
-          className="flex items-center gap-3 cursor-pointer group" 
-          onClick={() => onSelectTab && onSelectTab('home')}
+          className="cursor-pointer group flex items-center"
+          onClick={() => handleNavClick('home')}
           title="Barclay Online Bank - Bank Smarter. Live Better."
         >
-          <div className="bg-white/95 px-2.5 py-1 rounded-xl shadow-md border border-cyan-400/40 hover:border-cyan-300 transition-all flex items-center">
-            <img
-              src="/logo.png"
-              alt="Barclay Online Bank Logo"
-              className="h-9 sm:h-11 w-auto object-contain select-none transition-transform group-hover:scale-[1.02]"
-            />
-          </div>
+          <BrandLogo variant="horizontal" size="md" />
         </div>
 
-        {/* Center Navigation Links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-200">
+        {/* Center Desktop Navigation Links */}
+        <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-200">
           <button 
-            onClick={() => onSelectTab ? onSelectTab('home') : {}}
-            className={`hover:text-cyan-400 transition-colors ${activeTab === 'home' ? 'text-cyan-400 font-semibold' : ''}`}
+            onClick={() => handleNavClick('home')}
+            className={`hover:text-blue-400 transition-colors ${activeTab === 'home' && !isAdminMode ? 'text-blue-400 font-bold' : ''}`}
           >
-            {t.aboutUs ? 'Home' : 'Home'}
+            Home
           </button>
           
           {currentUser && (
             <button 
-              onClick={() => onSelectTab && onSelectTab('dashboard')}
-              className={`hover:text-cyan-400 transition-colors flex items-center gap-1.5 ${activeTab === 'dashboard' ? 'text-cyan-400 font-semibold' : ''}`}
+              onClick={() => handleNavClick('dashboard')}
+              className={`hover:text-blue-400 transition-colors flex items-center gap-1.5 ${activeTab === 'dashboard' && !isAdminMode ? 'text-blue-400 font-bold' : ''}`}
             >
-              <LayoutDashboard className="w-4 h-4" />
+              <LayoutDashboard className="w-4 h-4 text-blue-400" />
               <span>User Dashboard</span>
             </button>
           )}
 
           <button 
             onClick={onOpenAbout}
-            className="hover:text-cyan-400 transition-colors"
+            className="hover:text-blue-400 transition-colors"
           >
             {t.aboutUs}
           </button>
 
           <button 
             onClick={onOpenSupport}
-            className="hover:text-cyan-400 transition-colors"
+            className="hover:text-blue-400 transition-colors"
           >
             {t.contactSupport}
           </button>
@@ -172,31 +174,29 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right CTA / User State */}
         <div className="flex items-center gap-3">
-          {/* Admin Switcher / Mode indicator */}
-          <button
-            onClick={onToggleAdminView}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-semibold tracking-wide border transition-all ${
-              isAdminMode 
-                ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20 hover:bg-amber-400' 
-                : 'bg-[#002d5a] text-cyan-300 border-[#004080] hover:bg-[#003870] hover:border-cyan-400'
-            }`}
-            title="Switch between Customer Online Banking and Barclay Admin Dashboard"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>{isAdminMode ? 'Customer View' : 'Admin Portal'}</span>
-          </button>
-
           {currentUser ? (
             <div className="flex items-center gap-3">
+              {/* If user is an authorized admin, display a secure shortcut */}
+              {currentUser.role === 'admin' && (
+                <button
+                  onClick={onOpenAdminAuth}
+                  className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all"
+                  title="Administrative Management Console"
+                >
+                  <Lock className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Admin Console</span>
+                </button>
+              )}
+
               {/* Notification Bell */}
               <button
                 onClick={onOpenNotifications}
-                className="relative p-2 rounded-lg bg-[#002850] text-slate-200 hover:text-white border border-[#003d73] transition-colors"
+                className="relative p-2.5 rounded-xl bg-[#0F223D] text-slate-200 hover:text-white border border-[#1E3A5F] transition-colors"
                 title="Notifications"
               >
-                <Bell className="w-4 h-4" />
+                <Bell className="w-4 h-4 text-blue-400" />
                 {unreadNotificationsCount > 0 && (
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cyan-400 text-slate-950 text-[10px] font-black flex items-center justify-center animate-pulse">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] font-black flex items-center justify-center animate-pulse">
                     {unreadNotificationsCount > 9 ? '9+' : unreadNotificationsCount}
                   </span>
                 )}
@@ -206,28 +206,28 @@ export const Header: React.FC<HeaderProps> = ({
               <div className="relative">
                 <button
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
-                  className="flex items-center gap-2 bg-[#002850] hover:bg-[#003566] border border-[#003d73] px-3 py-1.5 rounded-lg text-left transition-colors"
+                  className="flex items-center gap-2.5 bg-[#0F223D] hover:bg-[#162C4E] border border-[#1E3A5F] px-3.5 py-1.5 rounded-xl text-left transition-all"
                 >
-                  <div className="w-7 h-7 rounded-full bg-cyan-600 text-white font-bold text-xs flex items-center justify-center border border-cyan-400">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-blue-400 text-white font-bold text-xs flex items-center justify-center border border-blue-300/40">
                     {currentUser.fullName.charAt(0)}{currentUser.surname.charAt(0)}
                   </div>
                   <div className="hidden sm:block">
-                    <p className="text-xs font-semibold leading-tight text-white">{currentUser.fullName}</p>
-                    <p className="text-[10px] text-cyan-300 leading-tight">Acc: {currentUser.accountNumber.slice(0, 4)}••••</p>
+                    <p className="text-xs font-bold leading-tight text-white">{currentUser.fullName}</p>
+                    <p className="text-[10px] text-blue-400 font-mono leading-tight">Acc: {currentUser.accountNumber.slice(0, 4)}••••</p>
                   </div>
-                  <ChevronDown className="w-3 h-3 text-slate-400" />
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                 </button>
 
                 {userMenuOpen && (
                   <div 
-                    className="absolute right-0 mt-2 w-56 bg-[#00172e] border border-[#003d73] rounded-lg shadow-2xl py-2 z-50 text-xs"
+                    className="absolute right-0 mt-2 w-60 bg-[#0A192F] border border-[#1E3A5F] rounded-2xl shadow-2xl py-2 z-50 text-xs"
                     onMouseLeave={() => setUserMenuOpen(false)}
                   >
-                    <div className="px-4 py-2 border-b border-[#002a4f]">
-                      <p className="font-semibold text-white">{currentUser.fullName} {currentUser.surname}</p>
-                      <p className="text-[11px] text-slate-400">{currentUser.email}</p>
-                      <div className="mt-1 flex items-center gap-1.5">
-                        <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 font-bold text-[10px] border border-cyan-800">
+                    <div className="px-4 py-2.5 border-b border-[#1E293B]">
+                      <p className="font-bold text-white text-sm">{currentUser.fullName} {currentUser.surname}</p>
+                      <p className="text-[11px] text-slate-400 font-mono">{currentUser.email}</p>
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <span className="px-2 py-0.5 rounded-md bg-blue-950 text-blue-300 font-bold text-[10px] border border-blue-800">
                           {currentUser.tier}
                         </span>
                         <span className="text-[10px] text-slate-400">
@@ -238,12 +238,12 @@ export const Header: React.FC<HeaderProps> = ({
 
                     <button
                       onClick={() => {
-                        onSelectTab && onSelectTab('dashboard');
+                        handleNavClick('dashboard');
                         setUserMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-[#002850] text-slate-200 flex items-center gap-2"
+                      className="w-full px-4 py-2.5 text-left hover:bg-[#0F223D] text-slate-200 flex items-center gap-2.5"
                     >
-                      <CreditCard className="w-3.5 h-3.5 text-cyan-400" />
+                      <CreditCard className="w-4 h-4 text-blue-400" />
                       <span>My Accounts & Cards</span>
                     </button>
 
@@ -252,9 +252,9 @@ export const Header: React.FC<HeaderProps> = ({
                         onOpenNotifications();
                         setUserMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-[#002850] text-slate-200 flex items-center gap-2"
+                      className="w-full px-4 py-2.5 text-left hover:bg-[#0F223D] text-slate-200 flex items-center gap-2.5"
                     >
-                      <Bell className="w-3.5 h-3.5 text-cyan-400" />
+                      <Bell className="w-4 h-4 text-blue-400" />
                       <span>Notifications ({unreadNotificationsCount})</span>
                     </button>
 
@@ -263,22 +263,22 @@ export const Header: React.FC<HeaderProps> = ({
                         onOpenSupport();
                         setUserMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-[#002850] text-slate-200 flex items-center gap-2"
+                      className="w-full px-4 py-2.5 text-left hover:bg-[#0F223D] text-slate-200 flex items-center gap-2.5"
                     >
-                      <Headphones className="w-3.5 h-3.5 text-cyan-400" />
+                      <Headphones className="w-4 h-4 text-blue-400" />
                       <span>24/7 Priority Support</span>
                     </button>
 
-                    <div className="border-t border-[#002a4f] my-1"></div>
+                    <div className="border-t border-[#1E293B] my-1"></div>
 
                     <button
                       onClick={() => {
                         onLogout();
                         setUserMenuOpen(false);
                       }}
-                      className="w-full px-4 py-2 text-left hover:bg-rose-950/40 text-rose-300 flex items-center gap-2"
+                      className="w-full px-4 py-2.5 text-left hover:bg-rose-950/40 text-rose-300 flex items-center gap-2.5"
                     >
-                      <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                      <LogOut className="w-4 h-4 text-rose-400" />
                       <span>{t.logout}</span>
                     </button>
                   </div>
@@ -286,23 +286,88 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <button
                 onClick={() => onOpenAuth('login')}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold text-slate-200 hover:text-white bg-[#002b54] hover:bg-[#00386e] border border-[#004080] transition-colors"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-[#0F223D] hover:bg-[#162C4E] border border-[#1E3A5F] transition-all"
               >
                 {t.login}
               </button>
               <button
                 onClick={() => onOpenAuth('register')}
-                className="px-4 py-1.5 rounded-lg text-xs font-bold text-slate-950 bg-gradient-to-r from-cyan-400 to-cyan-300 hover:from-cyan-300 hover:to-cyan-200 shadow-md shadow-cyan-500/20 transition-all hover:scale-[1.02]"
+                className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-500/25 transition-all hover:scale-[1.02]"
               >
                 {t.createAccount}
               </button>
             </div>
           )}
+
+          {/* Mobile hamburger menu toggle */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-xl text-slate-300 hover:text-white bg-[#0F223D] border border-[#1E3A5F]"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </div>
+
+      {/* Mobile Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-[#071324] border-b border-[#1E293B] px-4 py-4 space-y-3">
+          <button
+            onClick={() => handleNavClick('home')}
+            className={`w-full text-left py-2 px-3 rounded-lg text-sm font-semibold transition-colors ${
+              activeTab === 'home' ? 'bg-[#0F223D] text-blue-400' : 'text-slate-200'
+            }`}
+          >
+            Home
+          </button>
+
+          {currentUser && (
+            <button
+              onClick={() => handleNavClick('dashboard')}
+              className={`w-full text-left py-2 px-3 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2 ${
+                activeTab === 'dashboard' ? 'bg-[#0F223D] text-blue-400' : 'text-slate-200'
+              }`}
+            >
+              <LayoutDashboard className="w-4 h-4 text-blue-400" />
+              <span>User Dashboard</span>
+            </button>
+          )}
+
+          <button
+            onClick={() => { onOpenAbout(); setMobileMenuOpen(false); }}
+            className="w-full text-left py-2 px-3 rounded-lg text-sm font-semibold text-slate-200 hover:bg-[#0F223D]"
+          >
+            {t.aboutUs}
+          </button>
+
+          <button
+            onClick={() => { onOpenSupport(); setMobileMenuOpen(false); }}
+            className="w-full text-left py-2 px-3 rounded-lg text-sm font-semibold text-slate-200 hover:bg-[#0F223D]"
+          >
+            {t.contactSupport}
+          </button>
+
+          {!currentUser && (
+            <div className="pt-2 flex flex-col gap-2">
+              <button
+                onClick={() => { onOpenAuth('login'); setMobileMenuOpen(false); }}
+                className="w-full py-2.5 rounded-xl bg-[#0F223D] border border-[#1E3A5F] text-xs font-bold text-center"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={() => { onOpenAuth('register'); setMobileMenuOpen(false); }}
+                className="w-full py-2.5 rounded-xl bg-blue-600 text-xs font-bold text-center"
+              >
+                Open Account
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </header>
   );
 };

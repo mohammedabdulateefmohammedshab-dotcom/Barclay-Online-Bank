@@ -33,6 +33,7 @@ import {
   AccountTier 
 } from '../types';
 import { store } from '../lib/store';
+import { BrandLogo } from './BrandLogo';
 
 interface AdminDashboardProps {
   users: UserProfile[];
@@ -228,13 +229,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       <div className="bg-[#000a14] border-b border-[#002447] px-4 sm:px-6 lg:px-8 py-4">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="bg-white/95 px-3 py-1.5 rounded-xl shadow-md border border-cyan-400/40 shrink-0">
-              <img
-                src="/logo.png"
-                alt="Barclay Online Bank Logo"
-                className="h-10 sm:h-12 w-auto object-contain select-none"
-              />
-            </div>
+            <BrandLogo variant="horizontal" size="md" />
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-black text-white tracking-wide">CENTRAL CLEARING</h1>
