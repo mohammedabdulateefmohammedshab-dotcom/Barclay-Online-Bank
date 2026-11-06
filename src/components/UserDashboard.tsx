@@ -90,11 +90,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     cardHolder: `${currentUser.fullName} ${currentUser.surname}`.toUpperCase(),
     expiryDate: '11/29',
     cvv: '849',
-    cardType: 'debit',
-    brand: 'visa',
+    cardType: 'Barclay Platinum Digital Debit',
+    brand: 'barclay',
     status: 'inactive',
     activationCode: currentUser.pin || '1234',
-    issuerName: 'Barclay Card Services Ltd & Visa Europe Int.',
+    issuerName: 'Barclay Card Services & Global Clearing Gateway',
     dailyLimit: 2500,
     monthlyLimit: 25000,
     issuedAt: currentUser.createdAt,
@@ -148,7 +148,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       if (!res.success) {
         setCardActionMsg({ type: 'error', text: res.error || 'Failed to activate card.' });
       } else {
-        setCardActionMsg({ type: 'success', text: 'Card activated successfully with Visa Issuer clearance!' });
+        setCardActionMsg({ type: 'success', text: 'Card activated successfully with Barclay Issuer clearance!' });
         setActivationModalOpen(false);
         setActivationCodeInput('');
       }
@@ -349,6 +349,27 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
         </div>
       </div>
 
+      {/* Account Suspended Alert Banner */}
+      {currentUser.status === 'suspended' && (
+        <div className="bg-rose-950/90 border-b border-rose-600 px-4 py-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-rose-200">
+            <div className="flex items-center gap-3">
+              <ShieldAlert className="w-6 h-6 text-rose-400 shrink-0" />
+              <div className="text-xs">
+                <strong className="text-white block font-bold text-sm">Account Temporarily Restricted by Central Security</strong>
+                <span>Outbound transfers and withdrawals are on administrative hold. Please contact Barclay Customer Support to clear identity review.</span>
+              </div>
+            </div>
+            <button
+              onClick={onOpenSupport}
+              className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs shrink-0 transition-colors shadow"
+            >
+              Contact Support
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-8">
         
         {/* Global Toast / Feedback */}
@@ -372,7 +393,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1E293B] pb-4">
               <div>
                 <h2 className="text-2xl font-black text-white">Barclay Platinum Card Management</h2>
-                <p className="text-xs text-slate-400">View, activate, freeze, and manage limits for your Visa-authorized card</p>
+                <p className="text-xs text-slate-400">View, activate, freeze, and manage limits for your Barclay Platinum Debit Card</p>
               </div>
 
               <div className="flex items-center gap-2">
@@ -479,19 +500,22 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                     </div>
 
                     <div className="text-right">
-                      <span className="font-sans font-black text-sm italic tracking-widest text-blue-400">
-                        VISA
-                      </span>
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span className="font-mono font-black text-[11px] tracking-wider text-emerald-300">
+                          PLATINUM
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Card Issuer Validation Badge */}
                 <div className="p-3.5 rounded-xl bg-[#0F223D] border border-[#1E3A5F] text-xs text-slate-300 flex items-center gap-3">
-                  <ShieldCheck className="w-5 h-5 text-blue-400 shrink-0" />
+                  <ShieldCheck className="w-5 h-5 text-emerald-400 shrink-0" />
                   <div>
                     <p className="font-bold text-white">{card.issuerName}</p>
-                    <p className="text-[11px] text-slate-400">Authorized Visa Debit Network • EMVCo Certified</p>
+                    <p className="text-[11px] text-slate-400">Barclay Global Clearing Network • Independent Custody • EMV Encrypted</p>
                   </div>
                 </div>
               </div>
@@ -613,7 +637,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                     <div className="flex items-center justify-between p-3.5 rounded-xl bg-[#071324] border border-[#14233D]">
                       <div>
                         <p className="text-xs font-bold text-white">ATM Cash Withdrawals</p>
-                        <p className="text-[11px] text-slate-400">Cash access at global Visa/Plus network machines</p>
+                        <p className="text-[11px] text-slate-400">Cash access at global partner ATM clearing machines</p>
                       </div>
                       <button
                         onClick={() => handleToggleLimitSetting('atmWithdrawals')}

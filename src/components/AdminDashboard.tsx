@@ -30,7 +30,8 @@ import {
   PaymentSubmission, 
   VerificationRequest, 
   FinancialSettings, 
-  AccountTier 
+  AccountTier,
+  AdminAuditLog 
 } from '../types';
 import { store } from '../lib/store';
 import { BrandLogo } from './BrandLogo';
@@ -54,11 +55,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onViewReceipt,
   onExitAdmin
 }) => {
-  const [activeTab, setActiveTab] = useState<'search' | 'transactions' | 'payments' | 'verifications' | 'settings' | 'broadcast'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'transactions' | 'payments' | 'verifications' | 'settings' | 'broadcast' | 'audit'>('search');
   
   // Search state by 10-digit account number (Requirement 3)
   const [searchAccountInput, setSearchAccountInput] = useState('');
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(users[0] || null);
+  const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(store.getAuditLogs());
+  const [auditFilter, setAuditFilter] = useState('');
+  const [suspensionLoading, setSuspensionLoading] = useState(false);
   
   // Deposit funds form state (Requirement 3)
   const [depositAmount, setDepositAmount] = useState('');
@@ -188,6 +192,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     if (!selectedUser) return;
     await store.adminSetUserTier(selectedUser.accountNumber, tier);
   };
+
+  // Account Suspension / Reactivation
+  const handleToggleSuspension = async () => {
+    if (!selectedUser) return;
+    const isSuspended = selectedUser.status === 'suspended';
+    const actionName = isSuspended ? 'Reactivate' : 'Suspend';
+    if (!window.confirm(`Are you sure you want to ${actionName.toLowerCase()} customer account ${selectedUser.accountNumber} (${selectedUser.fullName} ${selectedUser.surname})?`)) {
+      return;
+    }
+    setSuspensionLoading(true);
+    try {
+      const res = await store.adminToggleUserSuspension(
+        selectedUser.accountNumber,
+        isSuspended ? 'Administrative security clearance restored' : 'Administrative compliance review'
+      );
+      if (res.success && res.user) {
+        setSelectedUser({ ...res.user });
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSuspensionLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const unsub = store.subscribe(() => {
+      setAuditLogs(store.getAuditLogs());
+    });
+    return unsub;
+  }, []);
 
   // Save Financial Settings (Requirement 10)
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -358,6 +393,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <BellRing className="w-4 h-4" />
             <span>Direct Notifications</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`py-3 px-4 text-xs font-bold whitespace-nowrap border-b-2 flex items-center gap-2 transition-all ${
+              activeTab === 'audit'
+                ? 'text-cyan-400 border-cyan-400 bg-[#00172e]'
+                : 'text-slate-400 border-transparent hover:text-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Audit Logs ({auditLogs.length})</span>
+          </button>
         </div>
       </div>
 
@@ -494,6 +541,37 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Account Security Status & Suspension Controls */}
+                    <div className="pt-2 flex items-center justify-between border-t border-[#002447] text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">Account Access:</span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                          selectedUser.status === 'suspended'
+                            ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                            : 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                        }`}>
+                          {selectedUser.status === 'suspended' ? 'Suspended' : 'Active'}
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleToggleSuspension}
+                        disabled={suspensionLoading}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all shadow ${
+                          selectedUser.status === 'suspended'
+                            ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                            : 'bg-rose-600 hover:bg-rose-500 text-white shadow-rose-600/20'
+                        }`}
+                      >
+                        {suspensionLoading
+                          ? 'Updating...'
+                          : selectedUser.status === 'suspended'
+                          ? 'Reactivate Account'
+                          : 'Suspend Account'}
+                      </button>
                     </div>
                   </div>
 
@@ -1111,6 +1189,100 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <span>Dispatch Notification</span>
             </button>
           </form>
+        )}
+
+        {/* TAB 7: Live Administrative Audit Trail */}
+        {activeTab === 'audit' && (
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-[#00172e] border border-[#002b52] shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[#002447]">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-cyan-400" />
+                    <h3 className="text-base font-extrabold text-white">Central Security Audit Log</h3>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Immutable event ledger recording all administrator logins, custody deposits, tier adjustments, and account status actions.
+                  </p>
+                </div>
+
+                <div className="relative w-full sm:w-64">
+                  <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    value={auditFilter}
+                    onChange={(e) => setAuditFilter(e.target.value)}
+                    placeholder="Filter audit entries..."
+                    className="w-full bg-[#001020] border border-[#003866] rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="overflow-x-auto mt-4">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[#00284d] text-slate-400 uppercase text-[10px] tracking-wider">
+                      <th className="py-3 px-3">Timestamp (UTC)</th>
+                      <th className="py-3 px-3">Action</th>
+                      <th className="py-3 px-3">Administrator</th>
+                      <th className="py-3 px-3">Target Account</th>
+                      <th className="py-3 px-3">Audit Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#002447]">
+                    {auditLogs
+                      .filter(l => {
+                        if (!auditFilter) return true;
+                        const q = auditFilter.toLowerCase();
+                        return (
+                          l.action.toLowerCase().includes(q) ||
+                          l.details.toLowerCase().includes(q) ||
+                          (l.targetAccount && l.targetAccount.includes(q)) ||
+                          l.adminEmail.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((log) => (
+                        <tr key={log.id} className="hover:bg-[#002040]/50 transition-colors">
+                          <td className="py-3 px-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">
+                            {new Date(log.timestamp).toLocaleString('en-US', {
+                              month: 'short',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider font-mono ${
+                              log.action.includes('LOGIN')
+                                ? 'bg-amber-950 text-amber-300 border border-amber-800'
+                                : log.action.includes('DEPOSIT')
+                                ? 'bg-emerald-950 text-emerald-300 border border-emerald-800'
+                                : log.action.includes('SUSPEND')
+                                ? 'bg-rose-950 text-rose-300 border border-rose-800'
+                                : log.action.includes('TIER')
+                                ? 'bg-cyan-950 text-cyan-300 border border-cyan-800'
+                                : 'bg-blue-950 text-blue-300 border border-blue-800'
+                            }`}>
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-[11px] text-cyan-400">
+                            {log.adminEmail}
+                          </td>
+                          <td className="py-3 px-3 font-mono font-bold text-white">
+                            {log.targetAccount || '—'}
+                          </td>
+                          <td className="py-3 px-3 text-slate-300 text-xs">
+                            {log.details}
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         )}
 
       </div>

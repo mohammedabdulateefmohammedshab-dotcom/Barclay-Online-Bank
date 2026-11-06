@@ -68,6 +68,32 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // Dedicated separate administrative route listener (#admin or staff key combination)
+  useEffect(() => {
+    const checkAdminRoute = () => {
+      const hash = window.location.hash.toLowerCase();
+      if (hash === '#admin' || hash === '#/admin' || hash === '#portal' || window.location.search.includes('admin=true')) {
+        setAdminAuthModalOpen(true);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Secure staff hotkey: Ctrl+Shift+A or Cmd+Shift+A
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
+        e.preventDefault();
+        setAdminAuthModalOpen(true);
+      }
+    };
+
+    checkAdminRoute();
+    window.addEventListener('hashchange', checkAdminRoute);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('hashchange', checkAdminRoute);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   // Filter current user's transactions and notifications
   const userTransactions = currentUser 
     ? transactions.filter(t => t.userId === currentUser.uid)

