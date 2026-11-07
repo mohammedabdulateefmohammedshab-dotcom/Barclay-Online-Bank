@@ -257,6 +257,19 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>24/7 Priority Support</span>
                     </button>
 
+                    {currentUser.role === 'admin' && (
+                      <button
+                        onClick={() => {
+                          onOpenAdminAuth();
+                          setUserMenuOpen(false);
+                        }}
+                        className="w-full px-4 py-2.5 text-left hover:bg-amber-950/40 text-amber-300 flex items-center gap-2.5 border-t border-[#1E293B]"
+                      >
+                        <ShieldCheck className="w-4 h-4 text-amber-400" />
+                        <span className="font-semibold">Administrator Console</span>
+                      </button>
+                    )}
+
                     <div className="border-t border-[#1E293B] my-1"></div>
 
                     <button
@@ -321,6 +334,16 @@ export const Header: React.FC<HeaderProps> = ({
             >
               <LayoutDashboard className="w-4 h-4 text-blue-400" />
               <span>User Dashboard</span>
+            </button>
+          )}
+
+          {currentUser?.role === 'admin' && (
+            <button
+              onClick={() => { onOpenAdminAuth(); setMobileMenuOpen(false); }}
+              className="w-full text-left py-2 px-3 rounded-lg text-sm font-semibold text-amber-300 hover:bg-amber-950/40 flex items-center gap-2"
+            >
+              <ShieldCheck className="w-4 h-4 text-amber-400" />
+              <span>Administrator Console</span>
             </button>
           )}
 

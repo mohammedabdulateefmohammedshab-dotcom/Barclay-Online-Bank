@@ -114,8 +114,10 @@ export const SupportModal: React.FC<SupportModalProps> = ({
             <span>UK Hotline: +44 20 7116 1000</span>
           </div>
           <div className="flex items-center gap-1.5">
-            <Mail className="w-3.5 h-3.5 text-cyan-400" />
-            <span>priority@barclay.bank</span>
+            <Mail className="w-3.5 h-3.5 text-emerald-400" />
+            <a href="mailto:newzelebarclaysupport@gmail.com" className="hover:text-emerald-400 transition-colors">
+              newzelebarclaysupport@gmail.com
+            </a>
           </div>
         </div>
 

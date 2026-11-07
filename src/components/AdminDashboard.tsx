@@ -277,12 +277,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#00172e] border border-[#002b52] text-xs">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              <span className="text-slate-400">Clearance:</span>
+              <span className="font-mono text-cyan-300 font-bold">newzelebarclaysupport@gmail.com</span>
+            </div>
+
             <button
               onClick={onExitAdmin}
               className="px-4 py-2 rounded-xl bg-[#002244] hover:bg-[#002f5c] border border-[#003d73] text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition-colors"
             >
               <Users className="w-4 h-4" />
-              <span>Switch to Customer Banking View</span>
+              <span>Exit Admin Portal</span>
             </button>
           </div>
         </div>

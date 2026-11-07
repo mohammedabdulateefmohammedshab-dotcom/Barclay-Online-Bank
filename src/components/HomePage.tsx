@@ -21,7 +21,8 @@ import {
   EyeOff,
   Clock,
   Send,
-  Users
+  Users,
+  Mail
 } from 'lucide-react';
 import { SupportedLanguage, TRANSLATIONS } from '../lib/languages';
 import { BrandLogo } from './BrandLogo';
@@ -104,7 +105,7 @@ export const HomePage: React.FC<HomePageProps> = ({
       icon: Headphones,
       title: 'Customer Support',
       tagline: '24/7 Global Help Desk',
-      desc: 'Around-the-clock priority technical assistance, direct ticket dispatch, account verification guidance, and live transaction resolution services.',
+      desc: 'Around-the-clock priority technical assistance, direct ticket dispatch, and live transaction resolution services. Direct Contact: newzelebarclaysupport@gmail.com',
       accent: 'border-emerald-500/30'
     }
   ];
@@ -481,6 +482,18 @@ export const HomePage: React.FC<HomePageProps> = ({
                     <span>24/7 Custody Help Desk</span>
                   </div>
                 </div>
+
+                {/* Direct Support Contact Info */}
+                <div className="flex items-center gap-2 pt-2 text-xs">
+                  <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-slate-300">Customer Support:</span>
+                  <a 
+                    href="mailto:newzelebarclaysupport@gmail.com" 
+                    className="font-mono text-emerald-300 hover:text-emerald-200 hover:underline font-semibold"
+                  >
+                    newzelebarclaysupport@gmail.com
+                  </a>
+                </div>
               </div>
 
               <div className="lg:col-span-4 flex flex-col gap-3">
@@ -492,9 +505,10 @@ export const HomePage: React.FC<HomePageProps> = ({
                 </button>
                 <button
                   onClick={onOpenSupport}
-                  className="w-full py-4 px-6 rounded-xl bg-[#0F223D] hover:bg-[#162C4E] text-slate-200 border border-[#1E3A5F] text-xs font-semibold text-center transition-all"
+                  className="w-full py-4 px-6 rounded-xl bg-[#0F223D] hover:bg-[#162C4E] text-slate-200 border border-[#1E3A5F] text-xs font-semibold text-center transition-all flex items-center justify-center gap-2"
                 >
-                  Contact 24/7 Support Desk
+                  <Headphones className="w-4 h-4 text-emerald-400" />
+                  <span>Contact 24/7 Support Desk</span>
                 </button>
               </div>
             </div>
@@ -512,6 +526,25 @@ export const HomePage: React.FC<HomePageProps> = ({
               <button onClick={onOpenSupport} className="hover:text-white transition-colors">{t.contactSupport}</button>
               <button onClick={() => onOpenAuth('login')} className="hover:text-white transition-colors">Client Sign In</button>
               <button onClick={() => onOpenAuth('register')} className="hover:text-white transition-colors">Create Account</button>
+            </div>
+          </div>
+
+          {/* Official Customer Support Banner in Footer */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-[#0F223D] border border-[#1E3A5F] text-xs text-slate-300">
+            <div className="flex items-center gap-2.5">
+              <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>Official Support Email:</span>
+              <a 
+                href="mailto:newzelebarclaysupport@gmail.com" 
+                className="font-mono text-emerald-400 hover:underline font-semibold"
+              >
+                newzelebarclaysupport@gmail.com
+              </a>
+            </div>
+            <div className="flex items-center gap-4 text-slate-400 text-[11px]">
+              <span>Canary Wharf, London, UK</span>
+              <span>•</span>
+              <span>24/7 International Desk</span>
             </div>
           </div>
 

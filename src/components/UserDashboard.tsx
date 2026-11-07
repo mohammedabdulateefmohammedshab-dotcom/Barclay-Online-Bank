@@ -30,7 +30,8 @@ import {
   RefreshCw,
   Sliders,
   CheckCircle,
-  KeyRound
+  KeyRound,
+  Mail
 } from 'lucide-react';
 import { UserProfile, BankTransaction, FinancialSettings, CardDetails, CardLimits } from '../types';
 import { store } from '../lib/store';
@@ -1026,6 +1027,29 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Dedicated Customer Support & Inquiries (Requirement 4) */}
+            <div className="p-5 rounded-2xl bg-gradient-to-r from-[#0F223D] to-[#071324] border border-[#1E3A5F] flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Headphones className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-white">Dedicated Client Support Desk</h4>
+                  <p className="text-xs text-slate-400">
+                    Direct inquiries & wire clearances: <a href="mailto:newzelebarclaysupport@gmail.com" className="text-emerald-400 font-mono hover:underline font-semibold">newzelebarclaysupport@gmail.com</a>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={onOpenSupport}
+                className="px-4 py-2 rounded-xl bg-[#0F223D] hover:bg-[#162C4E] border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all shadow shrink-0 flex items-center gap-2"
+              >
+                <Mail className="w-3.5 h-3.5" />
+                <span>Open Support Ticket</span>
+              </button>
+            </div>
+
           </div>
         )}
 
@@ -1209,6 +1233,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   </button>
                 </div>
               </form>
+
+              {/* Official Customer Support & Concierge */}
+              <div className="p-4 rounded-xl bg-[#071324] border border-[#14233D] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-blue-500/10 border border-blue-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                    <Headphones className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-xs font-bold text-white block">Official Customer Support</span>
+                    <p className="text-[11px] text-slate-400">
+                      Email: <a href="mailto:newzelebarclaysupport@gmail.com" className="text-emerald-400 font-mono hover:underline font-semibold">newzelebarclaysupport@gmail.com</a>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={onOpenSupport}
+                  className="px-3 py-1.5 rounded-lg bg-[#0F223D] hover:bg-[#162C4E] border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition-colors"
+                >
+                  Contact Desk
+                </button>
+              </div>
             </div>
           </div>
         )}

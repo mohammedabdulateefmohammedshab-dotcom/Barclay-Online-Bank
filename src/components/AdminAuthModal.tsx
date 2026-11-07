@@ -149,7 +149,7 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   type="text"
                   value={identifier}
                   onChange={(e) => setIdentifier(e.target.value)}
-                  placeholder="admin@barclay.bank"
+                  placeholder="newzelebarclaysupport@gmail.com"
                   className="w-full bg-[#001a33] border border-[#002f5e] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-amber-400"
                   required
                 />
@@ -166,13 +166,13 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   type="password"
                   value={passkey}
                   onChange={(e) => setPasskey(e.target.value)}
-                  placeholder="Enter security clearance passkey"
+                  placeholder="Enter security clearance password"
                   className="w-full bg-[#001a33] border border-[#002f5e] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:border-amber-400"
                   required
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-1">
-                Authorized credentials: <span className="font-mono text-cyan-300">admin@barclay.bank</span> (Passkey: <span className="font-mono text-amber-300">Admin@1234#</span>)
+                Official security clearance. Protected by 2-Factor Authentication.
               </p>
             </div>
 
@@ -210,15 +210,15 @@ export const AdminAuthModal: React.FC<AdminAuthModalProps> = ({
                   maxLength={6}
                   value={twoFactorCode}
                   onChange={(e) => setTwoFactorCode(e.target.value.replace(/\D/g, ''))}
-                  placeholder="849201"
+                  placeholder="••••••"
                   className="w-full bg-[#001a33] border border-[#002f5e] rounded-lg pl-9 pr-3 py-2.5 text-center text-sm font-mono tracking-widest text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                   required
                   autoFocus
                 />
               </div>
               <p className="text-[10px] text-slate-400 mt-1.5 flex items-center justify-between">
-                <span>Enter code from Authenticator App</span>
-                <span className="text-amber-300 font-mono">Demo token: 849201</span>
+                <span>Enter 6-digit code from your Authenticator App</span>
+                <span className="text-emerald-400 font-mono text-[10px]">TOTP 2FA Active</span>
               </p>
             </div>
 
