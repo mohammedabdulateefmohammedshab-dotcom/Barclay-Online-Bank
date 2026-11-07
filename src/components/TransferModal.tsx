@@ -439,6 +439,27 @@ export const TransferModal: React.FC<TransferModalProps> = ({
             />
           </div>
 
+          {/* Transparent Fee & Settlement Disclosure */}
+          <div className="p-3.5 rounded-xl bg-[#00172e] border border-[#00284d] space-y-1.5 text-xs">
+            <div className="flex items-center justify-between text-slate-300">
+              <span>Transfer Subtotal:</span>
+              <span className="font-mono font-bold text-white">${(parseFloat(amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300">
+              <span>Network / Clearing Fee:</span>
+              <span className="font-mono text-emerald-400 font-bold">$0.00 (Free Standard Clearance)</span>
+            </div>
+            <div className="border-t border-[#002447] pt-1.5 flex items-center justify-between text-xs font-bold">
+              <span className="text-white">Total Amount to Debit:</span>
+              <span className="font-mono text-emerald-400 font-extrabold text-sm">
+                ${(parseFloat(amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 pt-0.5">
+              Estimated processing & settlement: Instant to 24 business hours. Fully transparent with zero hidden deductions.
+            </p>
+          </div>
+
           <button
             type="submit"
             disabled={isSubmitting}

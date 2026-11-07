@@ -22,7 +22,10 @@ import {
   Eye, 
   Layers,
   ArrowRight,
-  BellRing
+  BellRing,
+  MessageSquare,
+  Mail,
+  CheckCheck
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -31,7 +34,9 @@ import {
   VerificationRequest, 
   FinancialSettings, 
   AccountTier,
-  AdminAuditLog 
+  AdminAuditLog,
+  SupportConversation,
+  ChatMessage
 } from '../types';
 import { store } from '../lib/store';
 import { BrandLogo } from './BrandLogo';
@@ -55,7 +60,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onViewReceipt,
   onExitAdmin
 }) => {
-  const [activeTab, setActiveTab] = useState<'search' | 'transactions' | 'payments' | 'verifications' | 'settings' | 'broadcast' | 'audit'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'transactions' | 'payments' | 'verifications' | 'chats' | 'settings' | 'broadcast' | 'audit'>('search');
   
   // Search state by 10-digit account number (Requirement 3)
   const [searchAccountInput, setSearchAccountInput] = useState('');
@@ -63,6 +68,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(store.getAuditLogs());
   const [auditFilter, setAuditFilter] = useState('');
   const [suspensionLoading, setSuspensionLoading] = useState(false);
+  
+  // Real-time Support Chats state
+  const [conversations, setConversations] = useState<SupportConversation[]>(store.getConversations());
+  const [selectedChatUserId, setSelectedChatUserId] = useState<string | null>(null);
+  const [adminReplyText, setAdminReplyText] = useState('');
+  const [adminReplySending, setAdminReplySending] = useState(false);
   
   // Deposit funds form state (Requirement 3)
   const [depositAmount, setDepositAmount] = useState('');
@@ -220,9 +231,36 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   useEffect(() => {
     const unsub = store.subscribe(() => {
       setAuditLogs(store.getAuditLogs());
+      setConversations(store.getConversations());
     });
     return unsub;
   }, []);
+
+  const unreadChatCount = store.getUnreadChatCountForAdmin();
+
+  // Handle select chat user
+  const handleSelectChatUser = (userId: string) => {
+    setSelectedChatUserId(userId);
+    store.markConversationReadByAdmin(userId);
+  };
+
+  // Handle send admin reply
+  const handleSendAdminReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedChatUserId || !adminReplyText.trim()) return;
+
+    setAdminReplySending(true);
+    try {
+      store.sendChatMessage({
+        userId: selectedChatUserId,
+        senderRole: 'admin',
+        message: adminReplyText.trim()
+      });
+      setAdminReplyText('');
+    } finally {
+      setAdminReplySending(false);
+    }
+  };
 
   // Save Financial Settings (Requirement 10)
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -374,6 +412,30 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           >
             <UserCheck className="w-4 h-4" />
             <span>Tier KYC Verifications ({pendingVerifications.length})</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setActiveTab('chats');
+              if (conversations.length > 0 && !selectedChatUserId) {
+                handleSelectChatUser(conversations[0].userId);
+              }
+            }}
+            className={`py-3 px-4 text-xs font-bold whitespace-nowrap border-b-2 flex items-center gap-2 transition-all ${
+              activeTab === 'chats'
+                ? 'text-cyan-400 border-cyan-400 bg-[#00172e]'
+                : 'text-slate-400 border-transparent hover:text-slate-200'
+            }`}
+          >
+            <MessageSquare className="w-4 h-4" />
+            <span>Live Support Chats</span>
+            {unreadChatCount > 0 ? (
+              <span className="px-1.5 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-black text-[10px] animate-pulse">
+                ({unreadChatCount})
+              </span>
+            ) : (
+              <span className="text-slate-500 text-[10px]">(0)</span>
+            )}
           </button>
 
           <button
@@ -946,6 +1008,248 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 ))
               )}
             </div>
+          </div>
+        )}
+
+        {/* TAB: Real-Time Live Support Chats */}
+        {activeTab === 'chats' && (
+          <div className="p-6 rounded-2xl bg-[#00172e] border border-[#002b52] shadow-xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#002447] pb-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-cyan-400" />
+                  <h3 className="text-base font-extrabold text-white">
+                    Live Support Desks & Real-Time Inquiries
+                  </h3>
+                  {unreadChatCount > 0 ? (
+                    <span className="px-2 py-0.5 rounded-full bg-cyan-400 text-slate-950 font-black text-xs">
+                      {unreadChatCount} Unread
+                    </span>
+                  ) : (
+                    <span className="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 font-bold text-xs">
+                      All Caught Up (0)
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Interact live with customers. Opening conversations or clicking Reset marks messages read and updates badges to (0).
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => store.markAllConversationsReadByAdmin()}
+                  className="px-3.5 py-2 rounded-xl bg-[#002244] hover:bg-[#002f5c] border border-[#003d73] text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition-colors"
+                >
+                  <CheckCheck className="w-4 h-4 text-cyan-400" />
+                  <span>Mark All Read / Reset (0)</span>
+                </button>
+              </div>
+            </div>
+
+            {conversations.length === 0 ? (
+              <div className="py-16 text-center text-slate-400 space-y-3">
+                <div className="w-14 h-14 mx-auto rounded-full bg-[#001326] border border-[#00284d] flex items-center justify-center text-slate-500">
+                  <MessageSquare className="w-7 h-7" />
+                </div>
+                <div>
+                  <h4 className="font-bold text-white text-sm">No Active Live Chat Conversations Yet</h4>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+                    When customers or visitors send messages through the website's Live Support widget, their channels will stream here instantly.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[580px]">
+                
+                {/* Conversation List (Left Panel) */}
+                <div className="lg:col-span-4 rounded-xl bg-[#001326] border border-[#00284d] flex flex-col overflow-hidden">
+                  <div className="p-3 bg-[#001020] border-b border-[#00284d] text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center justify-between">
+                    <span>Conversations ({conversations.length})</span>
+                    <span className="text-[10px] text-cyan-400 font-mono">24/7 Desk</span>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto divide-y divide-[#002244] scrollbar-thin">
+                    {conversations.map((conv) => {
+                      const isSelected = (selectedChatUserId || conversations[0]?.userId) === conv.userId;
+                      const hasUnread = (conv.unreadByAdminCount || 0) > 0;
+                      return (
+                        <button
+                          key={conv.id}
+                          type="button"
+                          onClick={() => handleSelectChatUser(conv.userId)}
+                          className={`w-full p-3.5 text-left transition-colors flex items-start gap-3 ${
+                            isSelected
+                              ? 'bg-[#002244] border-l-4 border-cyan-400'
+                              : 'hover:bg-[#001933] border-l-4 border-transparent'
+                          }`}
+                        >
+                          <div className="w-9 h-9 rounded-full bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-cyan-300 font-bold text-xs shrink-0 mt-0.5">
+                            {conv.userName?.charAt(0) || 'U'}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-1">
+                              <span className="font-bold text-xs text-white truncate">
+                                {conv.userName || 'Client'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 font-mono shrink-0">
+                                {conv.lastMessageTime ? new Date(conv.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                              {conv.lastMessage || 'Started conversation'}
+                            </p>
+                            <div className="flex items-center justify-between mt-1 text-[10px]">
+                              <span className="text-cyan-400 font-mono">
+                                Acc: {conv.userAccountNumber || 'Guest'}
+                              </span>
+                              {hasUnread && (
+                                <span className="px-1.5 py-0.2 rounded-full bg-cyan-400 text-slate-950 font-black text-[9px] animate-pulse">
+                                  {conv.unreadByAdminCount} new
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Message Thread & Reply Window (Right Panel) */}
+                {(() => {
+                  const activeConv = conversations.find(c => c.userId === (selectedChatUserId || conversations[0]?.userId)) || conversations[0];
+                  if (!activeConv) return null;
+                  const targetUser = users.find(u => u.uid === activeConv.userId);
+
+                  return (
+                    <div className="lg:col-span-8 rounded-xl bg-[#001326] border border-[#00284d] flex flex-col overflow-hidden">
+                      
+                      {/* Chat Header */}
+                      <div className="p-3.5 bg-[#001020] border-b border-[#00284d] flex items-center justify-between shrink-0">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 font-bold">
+                            {activeConv.userName?.charAt(0) || 'U'}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-black text-white text-xs sm:text-sm">
+                                {activeConv.userName}
+                              </h4>
+                              {targetUser && (
+                                <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-cyan-950 text-cyan-400 border border-cyan-800">
+                                  {targetUser.tier}
+                                </span>
+                              )}
+                              {targetUser?.status === 'suspended' && (
+                                <span className="px-2 py-0.2 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800">
+                                  Suspended
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-400">
+                              {activeConv.userEmail || targetUser?.email || 'Guest Client'} • Account: <span className="font-mono text-cyan-300 font-bold">{activeConv.userAccountNumber || targetUser?.accountNumber || 'N/A'}</span>
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="hidden sm:flex items-center gap-2 text-xs">
+                          <a
+                            href={`mailto:${activeConv.userEmail || 'newzelebarclaysupport@gmail.com'}`}
+                            className="px-2.5 py-1.5 rounded-lg bg-[#002040] hover:bg-[#002c59] text-cyan-300 text-xs font-semibold flex items-center gap-1.5 border border-[#003866]"
+                          >
+                            <Mail className="w-3.5 h-3.5" />
+                            <span>Email</span>
+                          </a>
+                        </div>
+                      </div>
+
+                      {/* Messages Stream */}
+                      <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#000d1a] scrollbar-thin">
+                        {activeConv.messages.length === 0 ? (
+                          <div className="text-center py-12 text-slate-500 text-xs">
+                            No messages in this inquiry thread yet.
+                          </div>
+                        ) : (
+                          activeConv.messages.map((msg) => {
+                            const isAdmin = msg.senderRole === 'admin';
+                            return (
+                              <div
+                                key={msg.id}
+                                className={`flex flex-col ${isAdmin ? 'items-end' : 'items-start'}`}
+                              >
+                                <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1 px-1">
+                                  <span className="font-semibold text-slate-300">{msg.senderName}</span>
+                                  <span>•</span>
+                                  <span className="font-mono">{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                <div
+                                  className={`max-w-[78%] px-4 py-2.5 rounded-2xl text-xs leading-relaxed shadow ${
+                                    isAdmin
+                                      ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-br-none shadow-cyan-600/10'
+                                      : 'bg-[#001e3d] text-slate-100 border border-[#003366] rounded-bl-none'
+                                  }`}
+                                >
+                                  {msg.message}
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+
+                      {/* Fast Reply Snippets */}
+                      <div className="px-4 py-2 bg-[#001020] border-t border-[#002447] flex items-center gap-1.5 overflow-x-auto scrollbar-none text-[11px] shrink-0">
+                        <span className="text-slate-500 text-[10px] shrink-0">Quick Presets:</span>
+                        <button
+                          type="button"
+                          onClick={() => setAdminReplyText('Hello! A Barclay senior clearing specialist has received your inquiry and is assisting you.')}
+                          className="px-2 py-0.5 rounded bg-[#001c38] hover:bg-[#002b54] text-cyan-300 text-[10px] whitespace-nowrap border border-[#003366]"
+                        >
+                          "Specialist assisting"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAdminReplyText('Your wire transaction has been verified and approved by the clearing desk.')}
+                          className="px-2 py-0.5 rounded bg-[#001c38] hover:bg-[#002b54] text-emerald-300 text-[10px] whitespace-nowrap border border-[#003366]"
+                        >
+                          "Transaction approved"
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setAdminReplyText('Thank you for contacting Barclay Online Bank. Please let us know if you need additional assistance.')}
+                          className="px-2 py-0.5 rounded bg-[#001c38] hover:bg-[#002b54] text-slate-300 text-[10px] whitespace-nowrap border border-[#003366]"
+                        >
+                          "Thank you"
+                        </button>
+                      </div>
+
+                      {/* Admin Message Reply Bar */}
+                      <form onSubmit={handleSendAdminReply} className="p-3 bg-[#001020] border-t border-[#00284d] flex items-center gap-2 shrink-0">
+                        <input
+                          type="text"
+                          value={adminReplyText}
+                          onChange={(e) => setAdminReplyText(e.target.value)}
+                          placeholder={`Reply to ${activeConv.userName} as Central Support Desk...`}
+                          className="flex-1 bg-[#00172e] border border-[#003366] rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400 font-sans"
+                        />
+                        <button
+                          type="submit"
+                          disabled={!adminReplyText.trim() || adminReplySending}
+                          className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center gap-1.5 transition-all disabled:opacity-40 shadow shrink-0"
+                        >
+                          <Send className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>{adminReplySending ? 'Sending...' : 'Send Reply'}</span>
+                        </button>
+                      </form>
+
+                    </div>
+                  );
+                })()}
+
+              </div>
+            )}
           </div>
         )}
 

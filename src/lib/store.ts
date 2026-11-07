@@ -1821,6 +1821,9 @@ class BarclayStore {
   public clearUserNotifications(userId: string) {
     this.notifications = this.notifications.filter(n => n.userId !== userId);
     setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    this.notify();
+  }
+
   // ================= SWIFT CODE VERIFICATION REQUESTS ($2,500 FLOW) =================
   public getSwiftRequests(): SwiftRequest[] {
     return [...this.swiftRequests];

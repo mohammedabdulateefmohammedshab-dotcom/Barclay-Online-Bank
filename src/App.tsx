@@ -23,6 +23,7 @@ import { TierUpgradeModal } from './components/TierUpgradeModal';
 import { NotificationsModal } from './components/NotificationsModal';
 import { SupportModal } from './components/SupportModal';
 import { AboutModal } from './components/AboutModal';
+import { LiveChatWidget } from './components/LiveChatWidget';
 import { testConnection } from './lib/firebase';
 
 export default function App() {
@@ -272,6 +273,14 @@ export default function App() {
         isOpen={aboutModalOpen}
         onClose={() => setAboutModalOpen(false)}
       />
+
+      {/* Floating 24/7 Live Support Chat (Only displayed outside admin dashboard) */}
+      {!isAdminMode && (
+        <LiveChatWidget
+          currentUser={currentUser}
+          onOpenAuth={() => handleOpenAuth('login')}
+        />
+      )}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import React, { useState } from 'react';
 import { 
   X, 
   ArrowDownRight, 
@@ -278,6 +279,27 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
                   required
                 />
               </div>
+            </div>
+
+            {/* Transparent Fee & Settlement Breakdown */}
+            <div className="p-3.5 rounded-xl bg-[#00172e] border border-[#00284d] space-y-1.5 text-xs">
+              <div className="flex items-center justify-between text-slate-300">
+                <span>Withdrawal Amount:</span>
+                <span className="font-mono font-bold text-white">${(parseFloat(amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD</span>
+              </div>
+              <div className="flex items-center justify-between text-slate-300">
+                <span>Disbursement Fee:</span>
+                <span className="font-mono text-emerald-400 font-bold">$0.00 (Standard Clearance)</span>
+              </div>
+              <div className="border-t border-[#002447] pt-1.5 flex items-center justify-between text-xs font-bold">
+                <span className="text-white">Net Payout to Beneficiary:</span>
+                <span className="font-mono text-emerald-400 font-extrabold text-sm">
+                  ${(parseFloat(amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2 })} USD
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 pt-0.5">
+                Standard processing time: 1-3 business days. No hidden banking commission.
+              </p>
             </div>
 
             <button
