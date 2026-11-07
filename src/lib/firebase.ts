@@ -1,11 +1,26 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { 
+  getAuth, 
+  setPersistence, 
+  indexedDBLocalPersistence, 
+  browserLocalPersistence 
+} from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
+
+// Configure robust Firebase Auth persistence across page refreshes and tab closures
+if (typeof window !== 'undefined') {
+  setPersistence(auth, indexedDBLocalPersistence)
+    .catch(() => setPersistence(auth, browserLocalPersistence))
+    .catch((err) => {
+      console.warn('Firebase Auth persistence initialisation:', err);
+    });
+}
+
 
 export enum OperationType {
   CREATE = 'create',

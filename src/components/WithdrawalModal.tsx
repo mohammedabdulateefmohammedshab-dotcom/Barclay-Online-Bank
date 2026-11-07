@@ -1,4 +1,3 @@
-import React, { useState } from 'react';
 import { 
   X, 
   ArrowDownRight, 
@@ -8,7 +7,9 @@ import {
   DollarSign, 
   ShieldCheck, 
   ArrowRight,
-  CheckCircle2
+  CheckCircle2,
+  ShieldAlert,
+  Mail
 } from 'lucide-react';
 import { UserProfile, FinancialSettings, BankTransaction } from '../types';
 import { store } from '../lib/store';
@@ -40,6 +41,55 @@ export const WithdrawalModal: React.FC<WithdrawalModalProps> = ({
   const [success, setSuccess] = useState(false);
 
   if (!isOpen) return null;
+
+  // Account Restriction System (Requirement 2)
+  if (currentUser.status === 'suspended') {
+    const supportEmail = settings.supportEmail || 'newzelebarclaysupport@gmail.com';
+    const mailtoSubject = encodeURIComponent(`Account Restriction Inquiry - ${currentUser.fullName} ${currentUser.surname} (${currentUser.accountNumber})`);
+    const mailtoBody = encodeURIComponent(`Hello, I am ${currentUser.fullName} ${currentUser.surname}. I am writing regarding my account (${currentUser.accountNumber}) which has been restricted...`);
+    const mailtoUrl = `mailto:${supportEmail}?subject=${mailtoSubject}&body=${mailtoBody}`;
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="relative w-full max-w-md bg-[#00172e] border border-rose-500/50 rounded-3xl shadow-2xl p-6 sm:p-8 text-white text-center space-y-5">
+          <button onClick={onClose} className="absolute right-4 top-4 p-1.5 rounded-lg text-slate-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
+          
+          <div className="w-16 h-16 mx-auto rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400">
+            <ShieldAlert className="w-8 h-8" />
+          </div>
+
+          <div>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-400 block">
+              Security Compliance Alert
+            </span>
+            <h3 className="text-lg font-black text-white mt-1">Account Suspension Active</h3>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-800/50 text-xs text-rose-200 leading-relaxed font-medium">
+            Your account has been suspended. Kindly contact support for more assistance.
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <button
+              onClick={onClose}
+              className="w-full sm:w-1/2 py-2.5 rounded-xl bg-[#002244] hover:bg-[#002f5c] text-xs font-semibold text-slate-300 transition-colors"
+            >
+              Close
+            </button>
+            <a
+              href={mailtoUrl}
+              className="w-full sm:w-1/2 py-2.5 rounded-xl bg-gradient-to-r from-rose-500 to-rose-600 hover:from-rose-400 hover:to-rose-500 text-xs font-bold text-white flex items-center justify-center gap-2 shadow-lg shadow-rose-500/20 transition-all"
+            >
+              <Mail className="w-4 h-4" />
+              <span>Contact Support</span>
+            </a>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleWithdrawalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

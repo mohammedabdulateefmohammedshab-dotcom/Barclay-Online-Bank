@@ -163,9 +163,67 @@ export interface CountryInfo {
 export interface AdminAuditLog {
   id: string;
   adminEmail: string;
-  action: 'ADMIN_LOGIN' | 'DEPOSIT_CREDITED' | 'TRANSACTION_APPROVED' | 'TRANSACTION_REVERSED' | 'PAYMENT_PROOF_APPROVED' | 'PAYMENT_PROOF_CANCELLED' | 'TIER_UPGRADE_APPROVED' | 'TIER_UPGRADE_REJECTED' | 'ACCOUNT_SUSPENDED' | 'ACCOUNT_REACTIVATED' | 'SETTINGS_UPDATED' | 'NOTIFICATION_DISPATCHED';
+  action: 
+    | 'ADMIN_LOGIN' 
+    | 'DEPOSIT_CREDITED' 
+    | 'TRANSACTION_APPROVED' 
+    | 'TRANSACTION_REVERSED' 
+    | 'PAYMENT_PROOF_APPROVED' 
+    | 'PAYMENT_PROOF_CANCELLED' 
+    | 'TIER_UPGRADE_APPROVED' 
+    | 'TIER_UPGRADE_REJECTED' 
+    | 'ACCOUNT_SUSPENDED' 
+    | 'ACCOUNT_REACTIVATED' 
+    | 'SETTINGS_UPDATED' 
+    | 'NOTIFICATION_DISPATCHED'
+    | 'SWIFT_CODE_APPROVED'
+    | 'SWIFT_CODE_REJECTED'
+    | 'CRYPTO_WALLET_UPDATED';
   targetAccount?: string;
   details: string;
   timestamp: string;
 }
+
+export interface SwiftRequest {
+  id: string;
+  userId: string;
+  accountNumber: string;
+  fullName: string;
+  email: string;
+  amount: number; // $2,500
+  paymentMethod: PaymentMethod;
+  txHashOrRef: string;
+  proofImageUrl?: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  assignedCode?: string;
+  createdAt: string;
+  updatedAt: string;
+  adminNotes?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderRole: 'user' | 'admin' | 'system';
+  senderName: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+}
+
+export interface SupportConversation {
+  id: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  userAccountNumber: string;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadByAdminCount: number;
+  unreadByUserCount: number;
+  status: 'open' | 'closed';
+  messages: ChatMessage[];
+}
+
 

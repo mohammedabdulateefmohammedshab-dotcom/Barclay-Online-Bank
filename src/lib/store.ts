@@ -1,5 +1,5 @@
 import { collection, doc, setDoc, updateDoc, getDoc, getDocs, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import {
   UserProfile,
@@ -11,7 +11,11 @@ import {
   AccountTier,
   CardDetails,
   CardLimits,
-  AdminAuditLog
+  AdminAuditLog,
+  SwiftRequest,
+  ChatMessage,
+  SupportConversation,
+  PaymentMethod
 } from '../types';
 
 // Default initial Financial Settings
@@ -32,94 +36,8 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   updatedAt: new Date().toISOString()
 };
 
-// Seed sample demo accounts so the evaluator can test immediately without friction
+// Seed authorized administrator and corporate clearance accounts
 export const SEED_USERS: UserProfile[] = [
-  {
-    uid: 'demo_user_1',
-    accountNumber: '4829103847',
-    fullName: 'Alexander',
-    surname: 'Hamilton',
-    email: 'a.hamilton@barclay.bank',
-    country: 'United Kingdom',
-    pin: '1234',
-    balance: 42500.00,
-    currency: 'USD',
-    tier: 'Tier 1',
-    status: 'active',
-    role: 'user',
-    swiftVerificationCode: '8492',
-    swiftVerified: true,
-    createdAt: '2026-01-15T09:00:00Z',
-    updatedAt: new Date().toISOString(),
-    card: {
-      id: 'card_1',
-      cardNumber: '4829 8812 9012 3847',
-      cvv: '842',
-      expiryDate: '11/29',
-      cardholderName: 'ALEXANDER HAMILTON',
-      cardType: 'Barclay Platinum Digital Debit',
-      brand: 'barclay',
-      status: 'active',
-      spendingLimit: 25000,
-      dailyLimit: 2500,
-      monthlyLimit: 25000,
-      onlineTransactions: true,
-      internationalTransactions: true,
-      atmWithdrawals: true,
-      contactless: true,
-      activationCode: '7482',
-      issuerName: 'Barclay Card Services & Global Clearing Gateway',
-      limits: {
-        onlinePayments: true,
-        internationalUsage: true,
-        atmWithdrawals: true,
-        contactless: true
-      }
-    }
-  },
-  {
-    uid: 'demo_user_2',
-    accountNumber: '9182736450',
-    fullName: 'Victoria',
-    surname: 'Sterling',
-    email: 'v.sterling@barclay.bank',
-    country: 'United States',
-    pin: '9876',
-    balance: 128450.00,
-    currency: 'USD',
-    tier: 'Tier 2',
-    status: 'active',
-    role: 'user',
-    swiftVerificationCode: '3104',
-    swiftVerified: true,
-    createdAt: '2026-02-10T11:20:00Z',
-    updatedAt: new Date().toISOString(),
-    card: {
-      id: 'card_2',
-      cardNumber: '4918 3409 1102 6450',
-      cvv: '391',
-      expiryDate: '06/30',
-      cardholderName: 'VICTORIA STERLING',
-      cardType: 'Barclay Platinum Digital Debit',
-      brand: 'barclay',
-      status: 'active',
-      spendingLimit: 50000,
-      dailyLimit: 5000,
-      monthlyLimit: 50000,
-      onlineTransactions: true,
-      internationalTransactions: true,
-      atmWithdrawals: true,
-      contactless: true,
-      activationCode: '3104',
-      issuerName: 'Barclay Card Services & Global Clearing Gateway',
-      limits: {
-        onlinePayments: true,
-        internationalUsage: true,
-        atmWithdrawals: true,
-        contactless: true
-      }
-    }
-  },
   {
     uid: 'demo_user_3',
     accountNumber: '5521908234',
@@ -320,14 +238,16 @@ export const SEED_NOTIFICATIONS: BankNotification[] = [
 
 // LocalStorage cache keys for high-availability & instant offline sync
 const CACHE_KEYS = {
-  USERS: 'barclay_cache_users_v2',
-  TRANSACTIONS: 'barclay_cache_transactions_v2',
-  PAYMENT_SUBMISSIONS: 'barclay_cache_payments_v2',
-  VERIFICATION_REQUESTS: 'barclay_cache_verifications_v2',
-  NOTIFICATIONS: 'barclay_cache_notifications_v2',
-  SETTINGS: 'barclay_cache_settings_v2',
-  CURRENT_USER_ID: 'barclay_active_user_id_v2',
-  AUDIT_LOGS: 'barclay_cache_audit_logs_v2'
+  USERS: 'barclay_cache_users_v3',
+  TRANSACTIONS: 'barclay_cache_transactions_v3',
+  PAYMENT_SUBMISSIONS: 'barclay_cache_payments_v3',
+  VERIFICATION_REQUESTS: 'barclay_cache_verifications_v3',
+  NOTIFICATIONS: 'barclay_cache_notifications_v3',
+  SETTINGS: 'barclay_cache_settings_v3',
+  CURRENT_USER_ID: 'barclay_active_user_id_v3',
+  AUDIT_LOGS: 'barclay_cache_audit_logs_v3',
+  SWIFT_REQUESTS: 'barclay_cache_swift_requests_v3',
+  CHAT_CONVERSATIONS: 'barclay_cache_chats_v3'
 };
 
 export const SEED_AUDIT_LOGS: AdminAuditLog[] = [
@@ -407,6 +327,8 @@ class BarclayStore {
   private verificationRequests: VerificationRequest[] = [];
   private notifications: BankNotification[] = [];
   private auditLogs: AdminAuditLog[] = [];
+  private swiftRequests: SwiftRequest[] = [];
+  private chatConversations: SupportConversation[] = [];
   private settings: FinancialSettings = DEFAULT_FINANCIAL_SETTINGS;
   private currentUserId: string | null = null;
   private listeners: Set<() => void> = new Set();
@@ -424,6 +346,8 @@ class BarclayStore {
     this.verificationRequests = getLocal<VerificationRequest[]>(CACHE_KEYS.VERIFICATION_REQUESTS, SEED_VERIFICATION_REQUESTS);
     this.notifications = getLocal<BankNotification[]>(CACHE_KEYS.NOTIFICATIONS, SEED_NOTIFICATIONS);
     this.auditLogs = getLocal<AdminAuditLog[]>(CACHE_KEYS.AUDIT_LOGS, SEED_AUDIT_LOGS);
+    this.swiftRequests = getLocal<SwiftRequest[]>(CACHE_KEYS.SWIFT_REQUESTS, []);
+    this.chatConversations = getLocal<SupportConversation[]>(CACHE_KEYS.CHAT_CONVERSATIONS, []);
     this.settings = getLocal<FinancialSettings>(CACHE_KEYS.SETTINGS, DEFAULT_FINANCIAL_SETTINGS);
     this.currentUserId = getLocal<string | null>(CACHE_KEYS.CURRENT_USER_ID, null);
 
@@ -601,6 +525,44 @@ class BarclayStore {
         console.warn('Firestore AuditLogs snapshot error:', err.message);
       });
 
+      // 8. SWIFT Requests Listener
+      onSnapshot(collection(db, 'swift_requests'), (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteRequests: SwiftRequest[] = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+          this.swiftRequests = remoteRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
+          this.notify();
+        }
+      }, (err) => {
+        console.warn('Firestore SwiftRequests snapshot warning:', err.message);
+      });
+
+      // 9. Support Chats Listener
+      onSnapshot(collection(db, 'chat_conversations'), (snapshot) => {
+        if (!snapshot.empty) {
+          const remoteChats: SupportConversation[] = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
+          this.chatConversations = remoteChats.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
+          setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
+          this.notify();
+        }
+      }, (err) => {
+        console.warn('Firestore ChatConversations snapshot warning:', err.message);
+      });
+
+      // 10. Firebase Auth State Persistence Sync across refreshes
+      onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser) {
+          const found = this.users.find(u => 
+            u.uid === firebaseUser.uid || u.email.toLowerCase() === (firebaseUser.email || '').toLowerCase()
+          );
+          if (found) {
+            this.currentUserId = found.uid;
+            setLocal(CACHE_KEYS.CURRENT_USER_ID, found.uid);
+            this.notify();
+          }
+        }
+      });
+
     } catch (e) {
       console.warn('Setup subscriptions encountered initial warning:', e);
     }
@@ -684,6 +646,10 @@ class BarclayStore {
     return this.users.find(u => u.accountNumber === clean) || null;
   }
 
+  public getUserById(uid: string): UserProfile | null {
+    return this.users.find(u => u.uid === uid) || null;
+  }
+
   // User Registration
   public async registerUser(payload: {
     fullName: string;
@@ -702,15 +668,8 @@ class BarclayStore {
       // Generate unique 10-digit account number
       const accountNumber = generate10DigitAccountNumber(this.users);
       const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-      const swiftVerificationCode = generate4DigitCode();
 
-      // Generate card details for new customer
-      const cardNum = `4532${accountNumber.slice(0, 4)}${Math.floor(10000000 + Math.random() * 90000000)}`.slice(0, 16);
-      const cardExpMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-      const cardExpYear = String((new Date().getFullYear() + 4) % 100).padStart(2, '0');
-      const cardExpiry = `${cardExpMonth}/${cardExpYear}`;
-      const cardCvv = String(Math.floor(100 + Math.random() * 900));
-
+      // Requirement: Do NOT auto-generate 4-digit transfer PINs and do NOT auto-generate virtual cards upon sign-up!
       const newUser: UserProfile = {
         uid,
         accountNumber,
@@ -725,31 +684,11 @@ class BarclayStore {
         tier: 'Tier 1',
         status: 'active',
         role: (emailLower === 'newzelebarclaysupport@gmail.com' || emailLower === 'mohammedabdulateefmohammedshab@gmail.com' || emailLower === 'admin@barclay.bank') ? 'admin' : 'user',
-        swiftVerificationCode,
-        swiftVerified: true,
+        swiftVerificationCode: undefined,
+        swiftVerified: false,
+        card: undefined,
         createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        card: {
-          id: `card_${Date.now()}`,
-          cardNumber: cardNum,
-          cardHolder: `${payload.fullName.trim()} ${payload.surname.trim()}`.toUpperCase(),
-          expiryDate: cardExpiry,
-          cvv: cardCvv,
-          cardType: 'Barclay Platinum Digital Debit',
-          brand: 'barclay',
-          status: 'inactive', // Requires card issuer activation code to activate
-          activationCode: payload.pin, // Connected to authorized issuer verification
-          issuerName: 'Barclay Card Services & Global Clearing Gateway',
-          dailyLimit: 2500,
-          monthlyLimit: 25000,
-          issuedAt: new Date().toISOString(),
-          limits: {
-            onlinePayments: true,
-            internationalUsage: true,
-            atmWithdrawals: true,
-            contactless: true
-          }
-        }
+        updatedAt: new Date().toISOString()
       };
 
       // Create welcome transaction
@@ -1280,6 +1219,11 @@ class BarclayStore {
     const user = this.users.find(u => u.uid === params.userId);
     if (!user) return { error: 'User session not found.' };
 
+    // Account Restriction Check
+    if (user.status === 'suspended') {
+      return { error: 'Your account has been suspended. Kindly contact support for more assistance.' };
+    }
+
     if (params.amount <= 0 || isNaN(params.amount)) {
       return { error: 'Please enter a valid transfer amount.' };
     }
@@ -1299,12 +1243,10 @@ class BarclayStore {
       return { error: `Transfer amount exceeds your ${user.tier} daily limit of $${dailyLimit.toLocaleString('en-US', { minimumFractionDigits: 2 })}. Consider upgrading your tier in Account Settings.` };
     }
 
-    // SWIFT 4-digit code verification check
-    // Requirement 4: "The system should have a four-digit verification code generated securely by the system. When a user attempts to make a transfer without completing the required verification, the system should display an appropriate verification message."
+    // SWIFT 4-digit code verification check per Requirement 3
     if (this.settings.requireSwiftCode) {
-      const validCode = user.swiftVerificationCode || '8492';
-      if (params.verificationCode.trim() !== validCode) {
-        return { error: `SWIFT Verification Failed: Invalid 4-digit authorization code. Please enter the secure code generated for your account (${validCode}).` };
+      if (!user.swiftVerificationCode || params.verificationCode.trim() !== user.swiftVerificationCode) {
+        return { error: 'Invalid credentials. Kindly request for your Swift Code.' };
       }
     }
 
@@ -1879,7 +1821,390 @@ class BarclayStore {
   public clearUserNotifications(userId: string) {
     this.notifications = this.notifications.filter(n => n.userId !== userId);
     setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+  // ================= SWIFT CODE VERIFICATION REQUESTS ($2,500 FLOW) =================
+  public getSwiftRequests(): SwiftRequest[] {
+    return [...this.swiftRequests];
+  }
+
+  public submitSwiftRequest(params: {
+    userId: string;
+    paymentMethod: PaymentMethod;
+    txHashOrRef: string;
+    proofImageUrl?: string;
+    adminNotes?: string;
+  }): SwiftRequest {
+    const user = this.getUserById(params.userId);
+    if (!user) throw new Error('User not found');
+
+    const req: SwiftRequest = {
+      id: `sw_${Date.now()}`,
+      userId: user.uid,
+      accountNumber: user.accountNumber,
+      fullName: `${user.fullName} ${user.surname}`,
+      email: user.email,
+      amount: 2500.00,
+      paymentMethod: params.paymentMethod,
+      txHashOrRef: params.txHashOrRef,
+      proofImageUrl: params.proofImageUrl,
+      status: 'Pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      adminNotes: params.adminNotes
+    };
+
+    this.swiftRequests.unshift(req);
+    setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
+
+    this.addAuditLog({
+      adminEmail: 'system',
+      action: 'SWIFT_CODE_REQUESTED' as any,
+      targetAccount: user.accountNumber,
+      details: `SWIFT 4-digit code clearance request submitted ($2,500 deposit fee via ${params.paymentMethod}). TxHash: ${params.txHashOrRef}`
+    });
+
+    try {
+      setDoc(doc(db, 'swift_requests', req.id), req);
+    } catch (e) {
+      console.warn('Firestore swift request write warning:', e);
+    }
+
     this.notify();
+    return req;
+  }
+
+  public async approveSwiftRequest(requestId: string): Promise<{ success: boolean; code?: string; error?: string }> {
+    const req = this.swiftRequests.find(r => r.id === requestId);
+    if (!req) return { success: false, error: 'Request not found' };
+
+    const user = this.getUserById(req.userId);
+    if (!user) return { success: false, error: 'Associated customer account not found' };
+
+    // Generate valid 4-digit transfer code
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    user.swiftVerificationCode = code;
+    user.swiftVerified = true;
+    user.updatedAt = new Date().toISOString();
+
+    // Requirement: The $2,500 deposit is NOT credited to the user's balance!
+    req.status = 'Approved';
+    req.assignedCode = code;
+    req.updatedAt = new Date().toISOString();
+
+    // Dispatch automated in-app notification containing the valid 4-digit transfer code
+    const notif: BankNotification = {
+      id: `notif_swift_${Date.now()}`,
+      userId: user.uid,
+      title: 'SWIFT 4-Digit Transfer Code Approved',
+      message: `Your SWIFT clearance deposit of $2,500 has been verified and approved by administration. Your authorized 4-digit transfer authorization code is: ${code}. You can now execute domestic and international wire transfers.`,
+      type: 'verification',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    this.notifications.unshift(notif);
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        swiftVerificationCode: code,
+        swiftVerified: true,
+        updatedAt: user.updatedAt
+      });
+      await updateDoc(doc(db, 'swift_requests', req.id), {
+        status: 'Approved',
+        assignedCode: code,
+        updatedAt: req.updatedAt
+      });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore approve swift update offline:', e);
+    }
+
+    this.addAuditLog({
+      adminEmail: 'newzelebarclaysupport@gmail.com',
+      action: 'SWIFT_CODE_APPROVED',
+      targetAccount: user.accountNumber,
+      details: `SWIFT authorization code ${code} issued to ${user.fullName} ${user.surname} upon $2,500 clearance approval.`
+    });
+
+    this.notify();
+    return { success: true, code };
+  }
+
+  public async rejectSwiftRequest(requestId: string, reason?: string): Promise<{ success: boolean; error?: string }> {
+    const req = this.swiftRequests.find(r => r.id === requestId);
+    if (!req) return { success: false, error: 'Request not found' };
+
+    req.status = 'Rejected';
+    req.adminNotes = reason || 'Payment proof verification unconfirmed.';
+    req.updatedAt = new Date().toISOString();
+
+    // Requirement: "Canceled/Rejected: No notification or code is sent to the user."
+    setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
+
+    try {
+      await updateDoc(doc(db, 'swift_requests', req.id), {
+        status: 'Rejected',
+        adminNotes: req.adminNotes,
+        updatedAt: req.updatedAt
+      });
+    } catch (e) {
+      console.warn('Firestore reject swift update offline:', e);
+    }
+
+    this.addAuditLog({
+      adminEmail: 'newzelebarclaysupport@gmail.com',
+      action: 'SWIFT_CODE_REJECTED',
+      targetAccount: req.accountNumber,
+      details: `SWIFT clearance request rejected for account ${req.accountNumber}. Reason: ${req.adminNotes}`
+    });
+
+    this.notify();
+    return { success: true };
+  }
+
+  // ================= ON-DEMAND VIRTUAL CARD ISSUANCE =================
+  public async issueVirtualCard(userId: string): Promise<{ success: boolean; card?: CardDetails; error?: string }> {
+    const user = this.getUserById(userId);
+    if (!user) return { success: false, error: 'User not found.' };
+
+    const cardNum = `4552 ${user.accountNumber.slice(0, 4)} ${Math.floor(1000 + Math.random() * 9000)} ${Math.floor(1000 + Math.random() * 9000)}`;
+    const cardExpMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+    const cardExpYear = String((new Date().getFullYear() + 4) % 100).padStart(2, '0');
+    const cardExpiry = `${cardExpMonth}/${cardExpYear}`;
+    const cardCvv = String(Math.floor(100 + Math.random() * 900));
+
+    const newCard: CardDetails = {
+      id: `card_${Date.now()}`,
+      cardNumber: cardNum,
+      cardholderName: `${user.fullName} ${user.surname}`.toUpperCase(),
+      cardHolder: `${user.fullName} ${user.surname}`.toUpperCase(),
+      expiryDate: cardExpiry,
+      cvv: cardCvv,
+      cardType: 'Barclay Platinum Digital Debit',
+      brand: 'barclay',
+      status: 'active',
+      spendingLimit: 250000,
+      dailyLimit: 25000,
+      monthlyLimit: 250000,
+      onlineTransactions: true,
+      internationalTransactions: true,
+      atmWithdrawals: true,
+      contactless: true,
+      activationCode: user.pin,
+      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      issuedAt: new Date().toISOString(),
+      limits: {
+        onlinePayments: true,
+        internationalUsage: true,
+        atmWithdrawals: true,
+        contactless: true
+      }
+    };
+
+    user.card = newCard;
+    user.updatedAt = new Date().toISOString();
+
+    const notif: BankNotification = {
+      id: `notif_card_${Date.now()}`,
+      userId: user.uid,
+      title: 'Barclay Platinum Virtual Debit Card Issued',
+      message: `Your new Barclay Platinum Digital Debit Card ending in ${cardNum.slice(-4)} has been generated, embossed, and activated with EMV 256-bit security clearance.`,
+      type: 'success',
+      read: false,
+      createdAt: new Date().toISOString()
+    };
+
+    this.notifications.unshift(notif);
+    setLocal(CACHE_KEYS.USERS, this.users);
+    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        card: newCard,
+        updatedAt: user.updatedAt
+      });
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+    } catch (e) {
+      console.warn('Firestore card issuance offline update:', e);
+    }
+
+    this.notify();
+    return { success: true, card: newCard };
+  }
+
+  // ================= ACCOUNT RESTRICTION & SUSPENSION =================
+  public async toggleUserSuspension(userId: string, newStatus: 'active' | 'suspended'): Promise<{ success: boolean; error?: string }> {
+    const user = this.getUserById(userId);
+    if (!user) return { success: false, error: 'User not found' };
+
+    user.status = newStatus;
+    user.updatedAt = new Date().toISOString();
+
+    setLocal(CACHE_KEYS.USERS, this.users);
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), {
+        status: newStatus,
+        updatedAt: user.updatedAt
+      });
+    } catch (e) {
+      console.warn('Firestore user status update offline:', e);
+    }
+
+    this.addAuditLog({
+      adminEmail: 'newzelebarclaysupport@gmail.com',
+      action: newStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_REACTIVATED',
+      targetAccount: user.accountNumber,
+      details: `User account status updated to: ${newStatus.toUpperCase()}`
+    });
+
+    this.notify();
+    return { success: true };
+  }
+
+  // ================= DYNAMIC CRYPTO WALLET MANAGEMENT =================
+  public async updateCryptoSettings(params: { btcAddress: string; usdtAddress: string }): Promise<{ success: boolean; error?: string }> {
+    this.settings.btcAddress = params.btcAddress.trim();
+    this.settings.usdtAddress = params.usdtAddress.trim();
+    this.settings.updatedAt = new Date().toISOString();
+
+    setLocal(CACHE_KEYS.SETTINGS, this.settings);
+
+    try {
+      await setDoc(doc(db, 'settings', 'financial'), this.settings, { merge: true });
+    } catch (e) {
+      console.warn('Firestore settings update offline:', e);
+    }
+
+    this.addAuditLog({
+      adminEmail: 'newzelebarclaysupport@gmail.com',
+      action: 'CRYPTO_WALLET_UPDATED',
+      details: `Dynamic deposit wallets updated: BTC=${params.btcAddress.slice(0, 8)}..., USDT=${params.usdtAddress.slice(0, 8)}...`
+    });
+
+    this.notify();
+    return { success: true };
+  }
+
+  // ================= REAL-TIME SUPPORT CHAT SYSTEM =================
+  public getConversations(): SupportConversation[] {
+    return [...this.chatConversations];
+  }
+
+  public getConversation(userId: string): SupportConversation | null {
+    return this.chatConversations.find(c => c.userId === userId) || null;
+  }
+
+  public getUnreadChatCountForAdmin(): number {
+    return this.chatConversations.reduce((acc, c) => acc + (c.unreadByAdminCount || 0), 0);
+  }
+
+  public markConversationReadByAdmin(userId: string): void {
+    const conv = this.chatConversations.find(c => c.userId === userId);
+    if (conv && conv.unreadByAdminCount > 0) {
+      conv.unreadByAdminCount = 0;
+      conv.messages.forEach(m => {
+        if (m.senderRole === 'user') m.read = true;
+      });
+      setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
+      try {
+        setDoc(doc(db, 'chat_conversations', conv.id), conv, { merge: true });
+      } catch (e) {
+        console.warn('Firestore mark read offline:', e);
+      }
+      this.notify();
+    }
+  }
+
+  public markAllConversationsReadByAdmin(): void {
+    this.chatConversations.forEach(conv => {
+      conv.unreadByAdminCount = 0;
+      conv.messages.forEach(m => {
+        if (m.senderRole === 'user') m.read = true;
+      });
+      try {
+        setDoc(doc(db, 'chat_conversations', conv.id), conv, { merge: true });
+      } catch (e) {
+        console.warn('Firestore mark all read offline:', e);
+      }
+    });
+    setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
+    this.notify();
+  }
+
+  public markConversationReadByUser(userId: string): void {
+    const conv = this.chatConversations.find(c => c.userId === userId);
+    if (conv && conv.unreadByUserCount > 0) {
+      conv.unreadByUserCount = 0;
+      conv.messages.forEach(m => {
+        if (m.senderRole === 'admin') m.read = true;
+      });
+      setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
+      this.notify();
+    }
+  }
+
+  public sendChatMessage(params: {
+    userId: string;
+    senderRole: 'user' | 'admin';
+    message: string;
+    senderName?: string;
+  }): ChatMessage {
+    const user = this.getUserById(params.userId);
+    const now = new Date().toISOString();
+    const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+
+    let conv = this.chatConversations.find(c => c.userId === params.userId);
+    if (!conv) {
+      conv = {
+        id: params.userId,
+        userId: params.userId,
+        userName: user ? `${user.fullName} ${user.surname}` : (params.senderName || 'Valued Client'),
+        userEmail: user?.email || '',
+        userAccountNumber: user?.accountNumber || '',
+        lastMessage: params.message,
+        lastMessageTime: now,
+        unreadByAdminCount: params.senderRole === 'user' ? 1 : 0,
+        unreadByUserCount: params.senderRole === 'admin' ? 1 : 0,
+        status: 'open',
+        messages: []
+      };
+      this.chatConversations.unshift(conv);
+    } else {
+      conv.lastMessage = params.message;
+      conv.lastMessageTime = now;
+      if (params.senderRole === 'user') {
+        conv.unreadByAdminCount = (conv.unreadByAdminCount || 0) + 1;
+      } else {
+        conv.unreadByUserCount = (conv.unreadByUserCount || 0) + 1;
+      }
+    }
+
+    const newMsg: ChatMessage = {
+      id: msgId,
+      chatId: params.userId,
+      senderId: params.senderRole === 'user' ? params.userId : 'admin',
+      senderRole: params.senderRole,
+      senderName: params.senderRole === 'admin' ? 'Barclay Support Desk' : (user ? `${user.fullName}` : 'Client'),
+      message: params.message.trim(),
+      timestamp: now,
+      read: false
+    };
+
+    conv.messages.push(newMsg);
+    setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
+
+    try {
+      setDoc(doc(db, 'chat_conversations', conv.id), conv, { merge: true });
+    } catch (e) {
+      console.warn('Firestore send chat offline:', e);
+    }
+
+    this.notify();
+    return newMsg;
   }
 }
 

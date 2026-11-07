@@ -15,7 +15,8 @@ import {
   Copy,
   Check,
   HelpCircle,
-  ArrowLeft
+  ArrowLeft,
+  ChevronDown
 } from 'lucide-react';
 import { SUPPORTED_COUNTRIES } from '../lib/banksData';
 import { store } from '../lib/store';
@@ -179,11 +180,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const fillDemoAccount = (accNum: string, pinCode: string) => {
-    setLoginIdentifier(accNum);
-    setLoginSecret(pinCode);
-    setErrorMessage('');
-  };
 
   const copyAccountNumber = (acc: string) => {
     navigator.clipboard.writeText(acc);
@@ -410,32 +406,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 {loading ? 'Authenticating...' : 'Sign In to My Account'}
                 <ArrowRight className="w-4 h-4" />
               </button>
-
-              {/* Demo quick-fill accounts */}
-              <div className="pt-4 border-t border-[#1E293B]">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  One-Click Demo Test Accounts:
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fillDemoAccount('4829103847', '1234')}
-                    className="p-2.5 rounded-xl bg-[#0F223D] hover:bg-[#162C4E] border border-[#1E293B] text-left text-xs transition-colors"
-                  >
-                    <p className="font-semibold text-white">Alexander H.</p>
-                    <p className="text-[10px] text-blue-400">Acc: 4829103847 (PIN: 1234)</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => fillDemoAccount('9182736450', '9876')}
-                    className="p-2.5 rounded-xl bg-[#0F223D] hover:bg-[#162C4E] border border-[#1E293B] text-left text-xs transition-colors"
-                  >
-                    <p className="font-semibold text-white">Victoria S.</p>
-                    <p className="text-[10px] text-blue-400">Acc: 9182736450 (PIN: 9876)</p>
-                  </button>
-                </div>
-              </div>
             </form>
           )}
 
@@ -490,15 +460,18 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Country <span className="text-blue-400">*</span> (30+ Countries Supported)
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Country <span className="text-blue-400">*</span></span>
+                  </span>
+                  <span className="text-[10px] text-slate-400">30+ Countries Supported</span>
                 </label>
                 <div className="relative">
-                  <Globe className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
                   <select
                     value={country}
                     onChange={(e) => setCountry(e.target.value)}
-                    className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500"
+                    className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl px-3.5 py-2.5 text-xs text-white appearance-none cursor-pointer focus:outline-none focus:border-blue-500 pr-9"
                     required
                   >
                     {SUPPORTED_COUNTRIES.map(c => (
@@ -507,6 +480,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       </option>
                     ))}
                   </select>
+                  <ChevronDown className="absolute right-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
                 </div>
               </div>
 
