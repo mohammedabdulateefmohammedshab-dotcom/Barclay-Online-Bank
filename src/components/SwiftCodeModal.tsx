@@ -126,9 +126,9 @@ export const SwiftCodeModal: React.FC<SwiftCodeModalProps> = ({
               <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
                 <CheckCircle2 className="w-10 h-10" />
               </div>
-              <h3 className="text-lg font-black text-white">Verification Dispatched to Admin</h3>
+              <h3 className="text-lg font-black text-white">Verification Dispatched for Barclay Review</h3>
               <p className="text-xs text-slate-300 leading-relaxed max-w-md mx-auto">
-                Your SWIFT clearing deposit proof of <span className="font-bold text-emerald-400">$2,500.00 USD</span> has been securely transmitted to the Barclay Administrator queue (<span className="font-mono text-cyan-300">newzelebarclaysupport@gmail.com</span>).
+                Your SWIFT clearing deposit proof of <span className="font-bold text-emerald-400">$2,500.00 USD</span> has been securely transmitted to the Barclay Clearing & Verification queue (<span className="font-mono text-cyan-300">newzelebarclaysupport@gmail.com</span>).
               </p>
               <div className="p-4 rounded-2xl bg-[#002040] border border-[#003866] text-left text-xs space-y-2">
                 <div className="flex justify-between text-slate-400">
@@ -141,11 +141,11 @@ export const SwiftCodeModal: React.FC<SwiftCodeModalProps> = ({
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>Verification Status:</span>
-                  <span className="text-amber-400 font-bold">Pending Admin Review</span>
+                  <span className="text-amber-400 font-bold">Pending Barclay Review</span>
                 </div>
               </div>
               <p className="text-[11px] text-slate-400">
-                Once administrator clearance is completed, your authorized 4-digit SWIFT transfer code will be dispatched directly to your in-app notifications.
+                Once Barclay clearance is completed, your authorized 4-digit SWIFT transfer code will be dispatched directly to your in-app notifications.
               </p>
               <button
                 onClick={onClose}
@@ -224,10 +224,10 @@ export const SwiftCodeModal: React.FC<SwiftCodeModalProps> = ({
                 </div>
               </div>
 
-              {/* Dynamic Admin Wallet Display */}
+              {/* Dynamic Clearing Wallet Display */}
               <div className="p-4 rounded-2xl bg-[#002040] border border-[#003866] space-y-3">
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-slate-400 font-medium">Official Admin Deposit Wallet:</span>
+                  <span className="text-slate-400 font-medium">Official Barclay Clearing Deposit Wallet:</span>
                   <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
                     Live Clearing Address
@@ -304,7 +304,7 @@ export const SwiftCodeModal: React.FC<SwiftCodeModalProps> = ({
                 disabled={isSubmitting || !txHash.trim()}
                 className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
               >
-                {isSubmitting ? 'Transmitting to Admin Queue...' : 'I Have Deposited ($2,500)'}
+                {isSubmitting ? 'Transmitting for Barclay Review...' : 'I Have Deposited ($2,500)'}
                 <ArrowRight className="w-4 h-4" />
               </button>
 

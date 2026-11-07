@@ -263,10 +263,10 @@ export const Header: React.FC<HeaderProps> = ({
                           onOpenAdminAuth();
                           setUserMenuOpen(false);
                         }}
-                        className="w-full px-4 py-2.5 text-left hover:bg-amber-950/40 text-amber-300 flex items-center gap-2.5 border-t border-[#1E293B]"
+                        className="w-full px-4 py-2.5 text-left hover:bg-[#002244] text-cyan-300 flex items-center gap-2.5 border-t border-[#1E293B]"
                       >
-                        <ShieldCheck className="w-4 h-4 text-amber-400" />
-                        <span className="font-semibold">Administrator Console</span>
+                        <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                        <span className="font-semibold">Management Portal</span>
                       </button>
                     )}
 
@@ -340,10 +340,10 @@ export const Header: React.FC<HeaderProps> = ({
           {currentUser?.role === 'admin' && (
             <button
               onClick={() => { onOpenAdminAuth(); setMobileMenuOpen(false); }}
-              className="w-full text-left py-2 px-3 rounded-lg text-sm font-semibold text-amber-300 hover:bg-amber-950/40 flex items-center gap-2"
+              className="w-full text-left py-2 px-3 rounded-lg text-sm font-semibold text-cyan-300 hover:bg-[#002244] flex items-center gap-2"
             >
-              <ShieldCheck className="w-4 h-4 text-amber-400" />
-              <span>Administrator Console</span>
+              <ShieldCheck className="w-4 h-4 text-cyan-400" />
+              <span>Management Portal</span>
             </button>
           )}
 

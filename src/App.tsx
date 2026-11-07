@@ -36,9 +36,23 @@ export default function App() {
   const [notifications, setNotifications] = useState<BankNotification[]>(store.getNotifications());
   const [settings, setSettings] = useState<FinancialSettings>(store.getSettings());
 
-  // Navigation & View Mode: REQUIREMENT 2: When someone clicks the website link, they MUST land directly on the public homepage!
-  const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>('home');
-  const [isAdminMode, setIsAdminMode] = useState<boolean>(false);
+  // Navigation & View Mode: Persistent across page refreshes per Requirement 3
+  const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>(() => {
+    const saved = typeof window !== 'undefined' ? sessionStorage.getItem('barclay_active_tab') : null;
+    if (saved === 'dashboard') return 'dashboard';
+    const initUser = store.getCurrentUser();
+    return initUser ? 'dashboard' : 'home';
+  });
+
+  const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const isHashAdmin = window.location.hash.toLowerCase().includes('admin');
+      const savedAdmin = sessionStorage.getItem('barclay_management_active') === 'true';
+      return savedAdmin || isHashAdmin;
+    }
+    return false;
+  });
+
   const [currentLang, setCurrentLang] = useState<SupportedLanguage>('en');
 
   // Modals state
@@ -112,6 +126,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem('barclay_active_tab');
+    sessionStorage.removeItem('barclay_management_active');
     store.setCurrentUserId(null);
     setCurrentUser(null);
     setActiveTab('home');
@@ -146,7 +162,9 @@ export default function App() {
         activeTab={isAdminMode ? 'admin' : activeTab}
         onSelectTab={(tab) => {
           setIsAdminMode(false);
+          sessionStorage.removeItem('barclay_management_active');
           setActiveTab(tab as any);
+          sessionStorage.setItem('barclay_active_tab', tab);
         }}
       />
 
@@ -162,6 +180,7 @@ export default function App() {
             settings={settings}
             onViewReceipt={(tx) => setSelectedReceiptTx(tx)}
             onExitAdmin={() => {
+              sessionStorage.removeItem('barclay_management_active');
               setIsAdminMode(false);
               setActiveTab('home');
             }}
@@ -201,6 +220,7 @@ export default function App() {
           store.setCurrentUserId(user.uid);
           setCurrentUser(user);
           setActiveTab('dashboard');
+          sessionStorage.setItem('barclay_active_tab', 'dashboard');
         }}
       />
 
@@ -210,6 +230,7 @@ export default function App() {
         onClose={() => setAdminAuthModalOpen(false)}
         onSuccess={() => {
           setIsAdminMode(true);
+          sessionStorage.setItem('barclay_management_active', 'true');
         }}
       />
 
