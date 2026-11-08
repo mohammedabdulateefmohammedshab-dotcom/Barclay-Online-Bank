@@ -254,7 +254,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   <div className="text-xs text-slate-300 space-y-0.5">
                     <p className="font-semibold text-white">Scan with Mobile Wallet</p>
                     <p className="text-[11px] text-slate-400">Minimum deposit: 50 USD equivalent.</p>
-                    <p className="text-[11px] text-slate-400">Credited automatically after admin approval.</p>
+                    <p className="text-[11px] text-slate-400">Credited automatically after approval by the authorized payment verification team.</p>
                   </div>
                 </div>
               </div>
@@ -350,7 +350,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </div>
                 <h5 className="text-lg font-bold text-white">Proof Submitted Successfully!</h5>
                 <p className="text-xs text-slate-300">
-                  Your payment submission is now <strong>Pending</strong> in the Barclay Review queue. You will receive an instant notification once approved and credited.
+                  Your payment submission is now <strong>Pending</strong> in the Aegis Review queue. You will receive an instant notification once approved and credited.
                 </p>
               </div>
             ) : (
@@ -449,7 +449,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   disabled={isSubmitting}
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs tracking-wide shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Transmitting Proof...' : 'Submit Proof for Barclay Review'}
+                  {isSubmitting ? 'Transmitting Proof...' : 'Submit Proof for Aegis Review'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>

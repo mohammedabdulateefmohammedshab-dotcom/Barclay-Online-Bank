@@ -364,9 +364,6 @@ export const TransferModal: React.FC<TransferModalProps> = ({
                 required
               />
             </div>
-            <p className="text-[10px] text-slate-400 mt-1">
-              Note: Transfer will be submitted as <strong className="text-amber-400">Pending</strong>. Per bank policy, funds are reserved and will be debited upon admin processing.
-            </p>
           </div>
 
           {/* SWIFT 4-Digit Verification Code Section (Gated Requirement 3) */}

@@ -61,8 +61,8 @@ export const SEED_USERS: UserProfile[] = [
       cvv: '702',
       expiryDate: '12/30',
       cardholderName: 'MOHAMMED SHAB',
-      cardType: 'Barclay Platinum Digital Debit',
-      brand: 'barclay',
+      cardType: 'Aegis Platinum Digital Debit',
+      brand: 'aegis',
       status: 'active',
       spendingLimit: 250000,
       dailyLimit: 25000,
@@ -72,7 +72,7 @@ export const SEED_USERS: UserProfile[] = [
       atmWithdrawals: true,
       contactless: true,
       activationCode: '9021',
-      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      issuerName: 'Aegis Card Services & Global Clearing Gateway',
       limits: {
         onlinePayments: true,
         internationalUsage: true,
@@ -82,9 +82,9 @@ export const SEED_USERS: UserProfile[] = [
     }
   },
   {
-    uid: 'admin_barclay_support',
+    uid: 'admin_aegis_support',
     accountNumber: '1000000001',
-    fullName: 'Barclay',
+    fullName: 'Aegis',
     surname: 'Administrator',
     email: 'newzelebarclaysupport@gmail.com',
     country: 'United Kingdom',
@@ -104,9 +104,9 @@ export const SEED_USERS: UserProfile[] = [
       cardNumber: '4552 1089 9021 5136',
       cvv: '513',
       expiryDate: '12/32',
-      cardholderName: 'BARCLAY ADMINISTRATOR',
-      cardType: 'Barclay Platinum Digital Debit',
-      brand: 'barclay',
+      cardholderName: 'AEGIS ADMINISTRATOR',
+      cardType: 'Aegis Platinum Digital Debit',
+      brand: 'aegis',
       status: 'active',
       spendingLimit: 500000,
       dailyLimit: 50000,
@@ -116,7 +116,7 @@ export const SEED_USERS: UserProfile[] = [
       atmWithdrawals: true,
       contactless: true,
       activationCode: '9021',
-      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      issuerName: 'Aegis Card Services & Global Clearing Gateway',
       limits: {
         onlinePayments: true,
         internationalUsage: true,
@@ -136,9 +136,9 @@ export const SEED_TRANSACTIONS: BankTransaction[] = [
     amount: 25000.00,
     currency: 'USD',
     status: 'Completed',
-    senderName: 'Barclays Clearing London',
+    senderName: 'Aegis Clearing London',
     recipientName: 'Alexander Hamilton',
-    reference: 'BCB-DEP-994821',
+    reference: 'AGS-DEP-994821',
     description: 'Initial Institutional Liquidity Allocation',
     createdAt: '2026-10-25T14:32:00Z',
     updatedAt: '2026-10-25T14:32:00Z'
@@ -153,7 +153,7 @@ export const SEED_TRANSACTIONS: BankTransaction[] = [
     status: 'Completed',
     senderName: 'Standard Chartered Wire',
     recipientName: 'Alexander Hamilton',
-    reference: 'BCB-DEP-773120',
+    reference: 'AGS-DEP-773120',
     description: 'International Commercial Settlement',
     createdAt: '2026-11-01T10:15:00Z',
     updatedAt: '2026-11-01T10:15:00Z'
@@ -172,8 +172,8 @@ export const SEED_TRANSACTIONS: BankTransaction[] = [
     recipientCountry: 'Switzerland',
     recipientAccountNumber: 'CH93 0024 0240 1234 5678',
     swiftCode: 'UBSWCHZH',
-    reference: 'BCB-TR-382910',
-    description: 'Discretionary Asset Transfer (Pending Barclay Review)',
+    reference: 'AGS-TR-382910',
+    description: 'Discretionary Asset Transfer (Pending Aegis Review)',
     createdAt: '2026-11-04T16:45:00Z',
     updatedAt: '2026-11-04T16:45:00Z'
   }
@@ -185,7 +185,7 @@ export const SEED_PAYMENT_SUBMISSIONS: PaymentSubmission[] = [
     userId: 'demo_user_1',
     accountNumber: '4829103847',
     userFullName: 'Alexander Hamilton',
-    userEmail: 'a.hamilton@barclay.bank',
+    userEmail: 'a.hamilton@aegisbank.com',
     method: 'BTC',
     amount: 5000.00,
     currency: 'USD',
@@ -209,7 +209,7 @@ export const SEED_VERIFICATION_REQUESTS: VerificationRequest[] = [
     mediaUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
     feePaid: 500,
     status: 'Pending Review',
-    notes: 'Facial biometric photograph submitted via Barclay Secure Portal.',
+    notes: 'Facial biometric photograph submitted via Aegis Secure Portal.',
     createdAt: '2026-11-05T05:30:00Z',
     updatedAt: '2026-11-05T05:30:00Z'
   }
@@ -219,7 +219,7 @@ export const SEED_NOTIFICATIONS: BankNotification[] = [
   {
     id: 'notif_seed_1',
     userId: 'demo_user_1',
-    title: 'Welcome to Barclay Online Bank',
+    title: 'Welcome to Aegis Online Bank',
     message: 'Your personal online banking profile and unique 10-digit account number 4829103847 have been generated and secured with 256-bit encryption.',
     type: 'success',
     read: false,
@@ -229,7 +229,7 @@ export const SEED_NOTIFICATIONS: BankNotification[] = [
     id: 'notif_seed_2',
     userId: 'demo_user_1',
     title: 'Wire Deposit Credited: $25,000.00',
-    message: 'A deposit from Barclays Clearing London in the exact amount of $25,000.00 has been credited to your account.',
+    message: 'A deposit from Aegis Clearing London in the exact amount of $25,000.00 has been credited to your account.',
     type: 'transaction',
     read: false,
     createdAt: '2026-10-25T14:32:00Z'
@@ -238,16 +238,16 @@ export const SEED_NOTIFICATIONS: BankNotification[] = [
 
 // LocalStorage cache keys for high-availability & instant offline sync
 const CACHE_KEYS = {
-  USERS: 'barclay_cache_users_v3',
-  TRANSACTIONS: 'barclay_cache_transactions_v3',
-  PAYMENT_SUBMISSIONS: 'barclay_cache_payments_v3',
-  VERIFICATION_REQUESTS: 'barclay_cache_verifications_v3',
-  NOTIFICATIONS: 'barclay_cache_notifications_v3',
-  SETTINGS: 'barclay_cache_settings_v3',
-  CURRENT_USER_ID: 'barclay_active_user_id_v3',
-  AUDIT_LOGS: 'barclay_cache_audit_logs_v3',
-  SWIFT_REQUESTS: 'barclay_cache_swift_requests_v3',
-  CHAT_CONVERSATIONS: 'barclay_cache_chats_v3'
+  USERS: 'aegis_cache_users_v4',
+  TRANSACTIONS: 'aegis_cache_transactions_v4',
+  PAYMENT_SUBMISSIONS: 'aegis_cache_payments_v4',
+  VERIFICATION_REQUESTS: 'aegis_cache_verifications_v4',
+  NOTIFICATIONS: 'aegis_cache_notifications_v4',
+  SETTINGS: 'aegis_cache_settings_v4',
+  CURRENT_USER_ID: 'aegis_active_user_id_v4',
+  AUDIT_LOGS: 'aegis_cache_audit_logs_v4',
+  SWIFT_REQUESTS: 'aegis_cache_swift_requests_v4',
+  CHAT_CONVERSATIONS: 'aegis_cache_chats_v4'
 };
 
 export const SEED_AUDIT_LOGS: AdminAuditLog[] = [
@@ -320,7 +320,7 @@ export function generate4DigitCode(): string {
 /**
  * State Management & Real-time Database Store
  */
-class BarclayStore {
+class AegisStore {
   private users: UserProfile[] = [];
   private transactions: BankTransaction[] = [];
   private paymentSubmissions: PaymentSubmission[] = [];
@@ -392,7 +392,7 @@ class BarclayStore {
         console.warn('Firestore Settings snapshot error (using cached fallback):', err.message);
       });
 
-      // 2. Users Listener
+      // 2. Users Listener - Real-time sync with automatic deduplication
       onSnapshot(collection(db, 'users'), (snapshot) => {
         if (!snapshot.empty) {
           const remoteUsers: UserProfile[] = [];
@@ -400,14 +400,19 @@ class BarclayStore {
             remoteUsers.push(d.data() as UserProfile);
           });
           if (remoteUsers.length > 0) {
-            // Merge with local users ensuring seeds exist
-            const merged = [...remoteUsers];
+            // Deduplicate and merge: prefer remote Firestore data, retain local unsynced if any
+            const mergedMap = new Map<string, UserProfile>();
+            for (const r of remoteUsers) {
+              const key = r.accountNumber || r.email.toLowerCase();
+              mergedMap.set(key, r);
+            }
             for (const localU of this.users) {
-              if (!merged.some(m => m.uid === localU.uid)) {
-                merged.push(localU);
+              const key = localU.accountNumber || localU.email.toLowerCase();
+              if (!mergedMap.has(key)) {
+                mergedMap.set(key, localU);
               }
             }
-            this.users = merged;
+            this.users = Array.from(mergedMap.values());
             setLocal(CACHE_KEYS.USERS, this.users);
             this.notify();
           }
@@ -661,7 +666,7 @@ class BarclayStore {
     return this.users.find(u => u.uid === uid) || null;
   }
 
-  // User Registration
+  // User Registration with Firebase Auth and Firestore synchronization
   public async registerUser(payload: {
     fullName: string;
     surname: string;
@@ -678,12 +683,32 @@ class BarclayStore {
 
       // Generate unique 10-digit account number
       const accountNumber = generate10DigitAccountNumber(this.users);
-      const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      let finalUid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      // Requirement 1: Every newly registered customer must start with a zero account balance ($0.00)
-      // Remove automatic $1,000 opening credit and do NOT auto-issue cards.
+      // Synchronize with Firebase Authentication
+      if (payload.password && payload.password.length >= 6) {
+        try {
+          const authCred = await createUserWithEmailAndPassword(auth, emailLower, payload.password);
+          if (authCred?.user?.uid) {
+            finalUid = authCred.user.uid;
+          }
+        } catch (authErr: any) {
+          if (authErr?.code === 'auth/email-already-in-use') {
+            try {
+              const signinCred = await signInWithEmailAndPassword(auth, emailLower, payload.password);
+              if (signinCred?.user?.uid) {
+                finalUid = signinCred.user.uid;
+              }
+            } catch {
+              // Proceed with unique finalUid
+            }
+          }
+        }
+      }
+
+      // Requirement 1: Every newly registered customer starts with $0.00 balance
       const newUser: UserProfile = {
-        uid,
+        uid: finalUid,
         accountNumber,
         fullName: payload.fullName.trim(),
         surname: payload.surname.trim(),
@@ -691,30 +716,30 @@ class BarclayStore {
         country: payload.country,
         pin: payload.pin,
         passwordHash: payload.password || '',
-        balance: 0.00, // Strictly $0.00 initial balance per Requirement 1
+        balance: 0.00, // Strictly $0.00 initial balance
         currency: 'USD',
         tier: 'Tier 1',
         status: 'active',
-        role: (emailLower === 'newzelebarclaysupport@gmail.com' || emailLower === 'mohammedabdulateefmohammedshab@gmail.com' || emailLower === 'admin@barclay.bank') ? 'admin' : 'user',
+        role: (emailLower === 'newzelebarclaysupport@gmail.com' || emailLower === 'mohammedabdulateefmohammedshab@gmail.com') ? 'admin' : 'user',
         swiftVerificationCode: undefined,
         swiftVerified: false,
-        card: undefined, // Virtual cards are only issued upon authorized request
+        card: undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      // Create welcome notification reflecting genuine $0.00 initial balance (NO opening bonus)
+      // Create welcome notification
       const welcomeNotif: BankNotification = {
         id: `notif_${Date.now()}`,
-        userId: uid,
+        userId: finalUid,
         title: 'Account Registered Successfully!',
-        message: `Welcome, ${payload.fullName} ${payload.surname}! Your unique 10-digit Barclay Online Banking account number is ${accountNumber}. Your initial opening balance is $0.00 USD.`,
+        message: `Welcome, ${payload.fullName} ${payload.surname}! Your unique 10-digit Aegis Online Banking account number is ${accountNumber}. Your initial opening balance is $0.00 USD.`,
         type: 'success',
         read: false,
         createdAt: new Date().toISOString()
       };
 
-      // Optimistic local update (DO NOT auto-login user per security requirement)
+      // Optimistic local update
       this.users.unshift(newUser);
       this.notifications.unshift(welcomeNotif);
 
@@ -722,10 +747,17 @@ class BarclayStore {
       setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
       this.notify();
 
-      // Async write to Firestore: store initial balance of 0
+      // Async write to Firestore: user profile, welcome notification, and account index
       try {
-        await setDoc(doc(db, 'users', uid), newUser);
+        await setDoc(doc(db, 'users', finalUid), newUser);
         await setDoc(doc(db, 'notifications', welcomeNotif.id), welcomeNotif);
+        await setDoc(doc(db, 'account_numbers', accountNumber), {
+          uid: finalUid,
+          accountNumber,
+          email: emailLower,
+          fullName: `${payload.fullName} ${payload.surname}`,
+          createdAt: new Date().toISOString()
+        });
       } catch (e) {
         console.warn('Firestore write warning during registration:', e);
       }
@@ -733,6 +765,37 @@ class BarclayStore {
       return { user: newUser };
     } catch (err: any) {
       return { user: null as any, error: err.message || 'Registration failed' };
+    }
+  }
+
+  // Force Instant Refresh from Firestore for Real-Time Sync
+  public async syncFromFirestoreNow(): Promise<{ count: number }> {
+    try {
+      const snap = await getDocs(collection(db, 'users'));
+      if (!snap.empty) {
+        const remoteUsers: UserProfile[] = [];
+        snap.forEach(d => {
+          remoteUsers.push(d.data() as UserProfile);
+        });
+        const mergedMap = new Map<string, UserProfile>();
+        for (const r of remoteUsers) {
+          const key = r.accountNumber || r.email.toLowerCase();
+          mergedMap.set(key, r);
+        }
+        for (const localU of this.users) {
+          const key = localU.accountNumber || localU.email.toLowerCase();
+          if (!mergedMap.has(key)) {
+            mergedMap.set(key, localU);
+          }
+        }
+        this.users = Array.from(mergedMap.values());
+        setLocal(CACHE_KEYS.USERS, this.users);
+        this.notify();
+      }
+      return { count: this.users.length };
+    } catch (e) {
+      console.warn('Manual Firestore sync warning:', e);
+      return { count: this.users.length };
     }
   }
 
@@ -747,7 +810,7 @@ class BarclayStore {
 
     // Generate secure temporary recovery token
     const recoveryCode = String(Math.floor(100000 + Math.random() * 900000));
-    const tempPass = `Barclay#${Math.floor(1000 + Math.random() * 9000)}`;
+    const tempPass = `Aegis#${Math.floor(1000 + Math.random() * 9000)}`;
     user.passwordHash = tempPass;
     user.updatedAt = new Date().toISOString();
 
@@ -788,7 +851,7 @@ class BarclayStore {
     }
 
     if (user.card.status === 'blocked') {
-      return { success: false, error: 'This card has been permanently blocked by Barclay Fraud Prevention and cannot be reactivated. Please request a replacement card.' };
+      return { success: false, error: 'This card has been permanently blocked by Aegis Fraud Prevention and cannot be reactivated. Please request a replacement card.' };
     }
 
     if (user.card.status === 'active') {
@@ -798,7 +861,7 @@ class BarclayStore {
     const cleanCode = activationCode.trim();
     // Validate against card activation code or user's security PIN
     if (user.card.activationCode && cleanCode !== user.card.activationCode && cleanCode !== user.pin && cleanCode !== '1234') {
-      return { success: false, error: 'Invalid card activation authorization code. Please verify the code provided by Barclay Card Issuer or enter your secure 4-digit PIN.' };
+      return { success: false, error: 'Invalid card activation authorization code. Please verify the code provided by Aegis Card Issuer or enter your secure 4-digit PIN.' };
     }
 
     user.card.status = 'active';
@@ -808,7 +871,7 @@ class BarclayStore {
       id: `notif_card_${Date.now()}`,
       userId: user.uid,
       title: 'Debit Card Activated Successfully',
-      message: `Your Barclay Platinum Debit Card ending in ${user.card.cardNumber.slice(-4)} has been activated with Barclay Issuer clearance. Online and contactless payments are now live.`,
+      message: `Your Aegis Platinum Debit Card ending in ${user.card.cardNumber.slice(-4)} has been activated with Aegis Issuer clearance. Online and contactless payments are now live.`,
       type: 'success',
       read: false,
       createdAt: new Date().toISOString()
@@ -853,8 +916,8 @@ class BarclayStore {
       userId: user.uid,
       title: newStatus === 'frozen' ? 'Card Temporarily Frozen' : 'Card Unfrozen & Active',
       message: newStatus === 'frozen'
-        ? `Your Barclay card ending in ${user.card.cardNumber.slice(-4)} has been frozen. All new purchases, ATM withdrawals, and online transactions are blocked.`
-        : `Your Barclay card ending in ${user.card.cardNumber.slice(-4)} has been unfrozen and is ready for use.`,
+        ? `Your Aegis card ending in ${user.card.cardNumber.slice(-4)} has been frozen. All new purchases, ATM withdrawals, and online transactions are blocked.`
+        : `Your Aegis card ending in ${user.card.cardNumber.slice(-4)} has been unfrozen and is ready for use.`,
       type: newStatus === 'frozen' ? 'warning' : 'info',
       read: false,
       createdAt: new Date().toISOString()
@@ -927,11 +990,11 @@ class BarclayStore {
       cardHolder: `${user.fullName} ${user.surname}`.toUpperCase(),
       expiryDate: cardExpiry,
       cvv: cardCvv,
-      cardType: 'Barclay Platinum Digital Debit',
-      brand: 'barclay',
+      cardType: 'Aegis Platinum Digital Debit',
+      brand: 'aegis',
       status: 'inactive', // New card requires activation
       activationCode: user.pin,
-      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      issuerName: 'Aegis Card Services & Global Clearing Gateway',
       dailyLimit: 2500,
       monthlyLimit: 25000,
       issuedAt: new Date().toISOString(),
@@ -950,7 +1013,7 @@ class BarclayStore {
       id: `notif_newcard_${Date.now()}`,
       userId: user.uid,
       title: 'Replacement Card Issued',
-      message: `A new Barclay Platinum Debit Card ending in ${newCard.cardNumber.slice(-4)} has been generated. Please activate your card to begin using it.`,
+      message: `A new Aegis Platinum Debit Card ending in ${newCard.cardNumber.slice(-4)} has been generated. Please activate your card to begin using it.`,
       type: 'info',
       read: false,
       createdAt: new Date().toISOString()
@@ -1115,7 +1178,7 @@ class BarclayStore {
 
     const previousBalance = user.balance;
     const newBalance = Math.round((previousBalance + params.amount) * 100) / 100;
-    const sender = params.senderName.trim() || 'Barclay Custody Services';
+    const sender = params.senderName.trim() || 'Aegis Treasury Services';
 
     const txId = `tx_dep_${Date.now()}`;
     const newTx: BankTransaction = {
@@ -1128,7 +1191,7 @@ class BarclayStore {
       status: 'Completed',
       senderName: sender,
       recipientName: `${user.fullName} ${user.surname}`,
-      reference: `BCB-DEP-${Math.floor(100000 + Math.random() * 900000)}`,
+      reference: `AGS-DEP-${Math.floor(100000 + Math.random() * 900000)}`,
       description: params.note?.trim() || `Administrative Deposit from ${sender}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -1349,7 +1412,7 @@ class BarclayStore {
       id: `notif_${Date.now()}`,
       userId: user.uid,
       title: 'Transaction Approved & Completed',
-      message: `Your ${tx.type} of $${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} (Ref: ${tx.reference}) has been approved and completed following Barclay Review.`,
+      message: `Your ${tx.type} of $${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} (Ref: ${tx.reference}) has been approved and completed following Aegis Review.`,
       type: 'success',
       read: false,
       relatedId: tx.id,
@@ -1469,7 +1532,7 @@ class BarclayStore {
       id: `notif_${Date.now()}`,
       userId: user.uid,
       title: 'Payment Proof Submitted',
-      message: `Your payment proof of $${params.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} via ${params.method.replace('_', ' ')} has been submitted. Status: Pending Barclay Review.`,
+      message: `Your payment proof of $${params.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} via ${params.method.replace('_', ' ')} has been submitted. Status: Pending Aegis Review.`,
       type: 'info',
       read: false,
       relatedId: subId,
@@ -1521,7 +1584,7 @@ class BarclayStore {
       status: 'Completed',
       senderName: `${sub.method.replace('_', ' ')} Network Deposit`,
       recipientName: `${user.fullName} ${user.surname}`,
-      reference: `BCB-PAY-${sub.txHashOrRef.slice(0, 8).toUpperCase()}`,
+      reference: `AGS-PAY-${sub.txHashOrRef.slice(0, 8).toUpperCase()}`,
       description: `Approved Payment Proof: ${sub.notes || sub.method}`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -1531,7 +1594,7 @@ class BarclayStore {
       id: `notif_${Date.now()}`,
       userId: user.uid,
       title: 'Payment Approved & Credited!',
-      message: `Your payment of $${sub.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} via ${sub.method.replace('_', ' ')} has been approved following Barclay Review and credited to your available balance.`,
+      message: `Your payment of $${sub.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} via ${sub.method.replace('_', ' ')} has been approved following Aegis Review and credited to your available balance.`,
       type: 'success',
       read: false,
       relatedId: sub.id,
@@ -1748,7 +1811,7 @@ class BarclayStore {
       id: `notif_${Date.now()}`,
       userId: user.uid,
       title: `Account Tier Updated to ${tier}`,
-      message: `Your account tier has been updated to ${tier} following Barclay Review.`,
+      message: `Your account tier has been updated to ${tier} following Aegis Review.`,
       type: 'info',
       read: false,
       createdAt: new Date().toISOString()
@@ -2003,8 +2066,8 @@ class BarclayStore {
       cardHolder: `${user.fullName} ${user.surname}`.toUpperCase(),
       expiryDate: cardExpiry,
       cvv: cardCvv,
-      cardType: 'Barclay Platinum Digital Debit',
-      brand: 'barclay',
+      cardType: 'Aegis Platinum Digital Debit',
+      brand: 'aegis',
       status: 'active',
       spendingLimit: 250000,
       dailyLimit: 25000,
@@ -2014,7 +2077,7 @@ class BarclayStore {
       atmWithdrawals: true,
       contactless: true,
       activationCode: user.pin,
-      issuerName: 'Barclay Card Services & Global Clearing Gateway',
+      issuerName: 'Aegis Card Services & Global Clearing Gateway',
       issuedAt: new Date().toISOString(),
       limits: {
         onlinePayments: true,
@@ -2030,8 +2093,8 @@ class BarclayStore {
     const notif: BankNotification = {
       id: `notif_card_${Date.now()}`,
       userId: user.uid,
-      title: 'Barclay Platinum Virtual Debit Card Issued',
-      message: `Your new Barclay Platinum Digital Debit Card ending in ${cardNum.slice(-4)} has been generated, embossed, and activated with EMV 256-bit security clearance.`,
+      title: 'Aegis Platinum Virtual Debit Card Issued',
+      message: `Your new Aegis Platinum Digital Debit Card ending in ${cardNum.slice(-4)} has been generated, embossed, and activated with EMV 256-bit security clearance.`,
       type: 'success',
       read: false,
       createdAt: new Date().toISOString()
@@ -2208,7 +2271,7 @@ class BarclayStore {
       chatId: params.userId,
       senderId: params.senderRole === 'user' ? params.userId : 'admin',
       senderRole: params.senderRole,
-      senderName: params.senderRole === 'admin' ? 'Barclay Support Desk' : (user ? `${user.fullName}` : 'Client'),
+      senderName: params.senderRole === 'admin' ? 'Aegis Support Desk' : (user ? `${user.fullName}` : 'Client'),
       message: params.message.trim(),
       timestamp: now,
       read: false
@@ -2228,4 +2291,4 @@ class BarclayStore {
   }
 }
 
-export const store = new BarclayStore();
+export const store = new AegisStore();

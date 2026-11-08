@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   Building2, 
   Search, 
@@ -25,7 +25,8 @@ import {
   BellRing,
   MessageSquare,
   Mail,
-  CheckCheck
+  CheckCheck,
+  RefreshCw
 } from 'lucide-react';
 import { 
   UserProfile, 

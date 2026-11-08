@@ -29,7 +29,7 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
   const currentSize = sizeMap[size];
   const isLight = theme === 'light';
 
-  // The Iconic Dimensional 'B' + Neoclassical Temple + Arc Swoosh Emblem (From IMG_4070)
+  // The Iconic Dimensional Aegis Shield + Neoclassical Temple + Arc Swoosh Emblem
   const renderEmblem = () => (
     <svg
       width={currentSize.emblemW}
@@ -40,15 +40,15 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
       className="shrink-0 select-none drop-shadow-md"
     >
       <defs>
-        {/* Deep Royal to Electric Blue Gradient for Letter B */}
-        <linearGradient id="bBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        {/* Deep Royal to Electric Blue Gradient for Aegis Emblem */}
+        <linearGradient id="aegisBlueGrad" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="#0066FF" />
           <stop offset="45%" stopColor="#0047AB" />
           <stop offset="85%" stopColor="#002D72" />
           <stop offset="100%" stopColor="#001F4D" />
         </linearGradient>
 
-        <linearGradient id="bHighlightGrad" x1="0%" y1="0%" x2="100%" y2="40%">
+        <linearGradient id="aegisHighlightGrad" x1="0%" y1="0%" x2="100%" y2="40%">
           <stop offset="0%" stopColor="#4D94FF" />
           <stop offset="100%" stopColor="#0055D4" />
         </linearGradient>
@@ -81,33 +81,27 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         </linearGradient>
       </defs>
 
-      {/* Outer Lower Spine of 'B' */}
+      {/* Outer Aegis Diamond-Shield Crest */}
       <path
-        d="M 28 15 L 82 15 C 104 15, 122 28, 122 48 C 122 62, 112 72, 98 77 C 118 82, 132 96, 132 114 C 132 136, 110 148, 84 148 L 28 148 Z"
-        fill="url(#bBlueGrad)"
+        d="M 80 10 L 138 38 C 138 92, 110 128, 80 148 C 50 128, 22 92, 22 38 Z"
+        fill="url(#aegisBlueGrad)"
       />
 
-      {/* Top Bow Highlight */}
+      {/* Inner Shield Bevel Highlight */}
       <path
-        d="M 28 15 L 82 15 C 102 15, 118 26, 118 46 C 118 60, 108 70, 94 75 L 28 75 Z"
-        fill="url(#bHighlightGrad)"
-        opacity="0.95"
+        d="M 80 18 L 130 42 C 130 88, 106 120, 80 138 C 54 120, 30 88, 30 42 Z"
+        fill="url(#aegisHighlightGrad)"
+        opacity="0.9"
       />
 
-      {/* Top Inner Cutout of B */}
+      {/* Inner Vault Core */}
       <path
-        d="M 52 32 L 80 32 C 90 32, 98 38, 98 48 C 98 58, 90 64, 80 64 L 52 64 Z"
+        d="M 80 26 L 122 47 C 122 82, 102 110, 80 126 C 58 110, 38 82, 38 47 Z"
         fill={isLight ? '#FFFFFF' : '#0A192F'}
       />
 
-      {/* Lower Inner Cutout of B */}
-      <path
-        d="M 52 86 L 82 86 C 94 86, 106 94, 106 108 C 106 122, 94 130, 82 130 L 52 130 Z"
-        fill={isLight ? '#FFFFFF' : '#0A192F'}
-      />
-
-      {/* NEOCLASSICAL BANK COLONNADE EMBLEM (Nestled inside the 'B' exactly as in approved logo) */}
-      <g transform="translate(32, 38)">
+      {/* NEOCLASSICAL BANK COLONNADE EMBLEM (Nestled inside the Aegis shield) */}
+      <g transform="translate(44, 46)">
         {/* Triangular Pediment / Gable */}
         <polygon points="36,4 4,20 68,20" fill="url(#templeSilver)" stroke="#003366" strokeWidth="1" />
         <polygon points="36,8 10,20 62,20" fill="#FFFFFF" opacity="0.4" />
@@ -115,23 +109,19 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         {/* Architrave / Entablature */}
         <rect x="6" y="20" width="60" height="5" rx="1" fill="url(#templeSilver)" stroke="#003366" strokeWidth="0.8" />
 
-        {/* 4 Stately Classical Columns */}
-        {/* Column 1 */}
+        {/* 4 Classical Columns */}
         <rect x="11" y="27" width="7" height="28" rx="1.5" fill="url(#templeSilver)" />
         <rect x="9" y="25" width="11" height="3" rx="0.5" fill="#FFFFFF" />
         <rect x="9" y="54" width="11" height="3" rx="0.5" fill="url(#templeSilver)" />
 
-        {/* Column 2 */}
         <rect x="25" y="27" width="7" height="28" rx="1.5" fill="url(#templeSilver)" />
         <rect x="23" y="25" width="11" height="3" rx="0.5" fill="#FFFFFF" />
         <rect x="23" y="54" width="11" height="3" rx="0.5" fill="url(#templeSilver)" />
 
-        {/* Column 3 */}
         <rect x="39" y="27" width="7" height="28" rx="1.5" fill="url(#templeSilver)" />
         <rect x="37" y="25" width="11" height="3" rx="0.5" fill="#FFFFFF" />
         <rect x="37" y="54" width="11" height="3" rx="0.5" fill="url(#templeSilver)" />
 
-        {/* Column 4 */}
         <rect x="53" y="27" width="7" height="28" rx="1.5" fill="url(#templeSilver)" />
         <rect x="51" y="25" width="11" height="3" rx="0.5" fill="#FFFFFF" />
         <rect x="51" y="54" width="11" height="3" rx="0.5" fill="url(#templeSilver)" />
@@ -141,20 +131,20 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
         <rect x="1" y="61" width="70" height="5" rx="1" fill="url(#templeSilver)" />
       </g>
 
-      {/* DYNAMIC SWOOSH 1: Silver Chrome Crescent sweeping from bottom-left through the waist */}
+      {/* DYNAMIC SWOOSH 1: Silver Chrome Crescent sweeping around the shield */}
       <path
-        d="M 6 92 C 14 122, 42 144, 76 132 C 104 122, 128 92, 136 70 C 120 86, 96 102, 70 106 C 42 110, 22 98, 6 92 Z"
+        d="M 12 102 C 24 134, 52 148, 80 148 C 114 148, 142 122, 150 96 C 132 114, 106 124, 78 122 C 50 120, 28 108, 12 102 Z"
         fill="url(#swooshSilver)"
       />
 
-      {/* DYNAMIC SWOOSH 2: Electric Bright Blue Arc sweeping up over top right */}
+      {/* DYNAMIC SWOOSH 2: Electric Bright Blue Arc sweeping up over the crest */}
       <path
-        d="M 44 94 C 74 86, 112 66, 134 32 C 142 20, 146 12, 146 8 C 144 14, 134 36, 114 56 C 92 76, 62 88, 44 94 Z"
+        d="M 50 96 C 80 88, 122 66, 142 32 C 150 20, 152 12, 152 8 C 150 14, 138 36, 118 56 C 96 76, 68 90, 50 96 Z"
         fill="url(#swooshElectric)"
       />
 
-      {/* Subtle Lime Green Spark Accent at the crest */}
-      <circle cx="146" cy="8" r="3.5" fill="url(#limeAccent)" />
+      {/* Subtle Lime Green Spark Accent at the apex */}
+      <circle cx="152" cy="8" r="3.5" fill="url(#limeAccent)" />
     </svg>
   );
 
@@ -167,13 +157,10 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
     );
   }
 
-  // The Typography matching IMG_4070 exactly:
-  // "BARCLAY" with dynamic blue crest wing over the 'R' and 'C'
-  // "ONLINE BANK" in electric bright blue
-  // "— Bank Smarter. Live Better. —"
+  // The Typography for Aegis Online Bank
   const renderTypography = () => (
     <div className="flex flex-col justify-center leading-none">
-      {/* Top Line: BARCLAY with dynamic blue swoosh */}
+      {/* Top Line: AEGIS with dynamic cyan crest wing */}
       <div className="relative flex items-center">
         <span
           className={`font-black tracking-tight uppercase select-none ${
@@ -181,16 +168,16 @@ export const BrandLogo: React.FC<BrandLogoProps> = ({
           }`}
           style={{
             fontSize: size === 'xl' ? '2.4rem' : size === 'lg' ? '1.85rem' : size === 'md' ? '1.45rem' : size === 'sm' ? '1.15rem' : '0.95rem',
-            letterSpacing: '0.04em',
+            letterSpacing: '0.06em',
             lineHeight: 1
           }}
         >
-          BARCLAY
+          AEGIS
         </span>
 
-        {/* Dynamic bright blue swoosh leaping over 'R' and 'C' */}
+        {/* Dynamic bright blue swoosh leaping over 'E' and 'G' */}
         <svg
-          className="absolute left-[38%] -top-2.5 w-[35%] h-3 pointer-events-none"
+          className="absolute left-[30%] -top-2.5 w-[38%] h-3 pointer-events-none"
           viewBox="0 0 100 24"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
