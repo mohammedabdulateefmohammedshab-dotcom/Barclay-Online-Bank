@@ -350,7 +350,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </div>
                 <h5 className="text-lg font-bold text-white">Proof Submitted Successfully!</h5>
                 <p className="text-xs text-slate-300">
-                  Your payment submission is now <strong>Pending</strong> in the Administrator queue. You will receive an instant notification once approved.
+                  Your payment submission is now <strong>Pending</strong> in the Barclay Review queue. You will receive an instant notification once approved and credited.
                 </p>
               </div>
             ) : (
@@ -449,7 +449,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   disabled={isSubmitting}
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs tracking-wide shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Transmitting Proof...' : 'Submit Proof to Administrator'}
+                  {isSubmitting ? 'Transmitting Proof...' : 'Submit Proof for Barclay Review'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>

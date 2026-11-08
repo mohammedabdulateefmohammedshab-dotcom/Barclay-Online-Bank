@@ -306,11 +306,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-lg font-black text-white tracking-wide">CENTRAL CLEARING</h1>
-                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-amber-500 text-slate-950">
-                  ADMIN CONSOLE
+                <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-cyan-400 text-slate-950">
+                  MANAGEMENT PORTAL
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">Canary Wharf Administrative Portal • Real-Time Database Synchronized</p>
+              <p className="text-[11px] text-slate-400">Canary Wharf Administrative Gateway • Real-Time Database Synchronized</p>
             </div>
           </div>
 
@@ -323,10 +323,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               onClick={onExitAdmin}
-              className="px-4 py-2 rounded-xl bg-[#002244] hover:bg-[#002f5c] border border-[#003d73] text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition-colors"
+              className="px-4 py-2 rounded-xl bg-[#002244] hover:bg-[#002f5c] border border-[#003d73] text-cyan-300 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <Users className="w-4 h-4" />
-              <span>Exit Admin Portal</span>
+              <span>Exit Management Portal</span>
             </button>
           </div>
         </div>

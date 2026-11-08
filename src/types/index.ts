@@ -165,6 +165,7 @@ export interface AdminAuditLog {
   adminEmail: string;
   action: 
     | 'ADMIN_LOGIN' 
+    | 'MANAGEMENT_LOGIN'
     | 'DEPOSIT_CREDITED' 
     | 'TRANSACTION_APPROVED' 
     | 'TRANSACTION_REVERSED' 

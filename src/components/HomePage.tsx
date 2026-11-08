@@ -37,6 +37,7 @@ interface HomePageProps {
 
 export const HomePage: React.FC<HomePageProps> = ({
   onOpenAuth,
+  onOpenAdminAuth,
   onOpenAbout,
   onOpenSupport,
   currentLang
@@ -526,6 +527,7 @@ export const HomePage: React.FC<HomePageProps> = ({
               <button onClick={onOpenSupport} className="hover:text-white transition-colors">{t.contactSupport}</button>
               <button onClick={() => onOpenAuth('login')} className="hover:text-white transition-colors">Client Sign In</button>
               <button onClick={() => onOpenAuth('register')} className="hover:text-white transition-colors">Create Account</button>
+              <button onClick={onOpenAdminAuth} className="hover:text-slate-300 text-slate-500 transition-colors text-[10px]">Management</button>
             </div>
           </div>
 
