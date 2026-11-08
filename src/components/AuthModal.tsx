@@ -242,8 +242,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <span className="font-semibold text-blue-300">{registeredUser.tier}</span>
               </div>
               <div>
-                <span className="text-slate-400">Opening Bonus: </span>
-                <span className="font-semibold text-emerald-400">$1,000.00 USD</span>
+                <span className="text-slate-400">Initial Balance: </span>
+                <span className="font-semibold text-slate-200">$0.00 USD</span>
               </div>
               <div>
                 <span className="text-slate-400">Country: </span>

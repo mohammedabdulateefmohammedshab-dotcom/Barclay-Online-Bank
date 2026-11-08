@@ -366,6 +366,12 @@ class BarclayStore {
       setLocal(CACHE_KEYS.USERS, this.users);
     }
 
+    // Purge legacy automated Welcome Credit transactions per Requirement 1 & 4
+    this.transactions = this.transactions.filter(t => 
+      t.description !== 'New Account Opening Welcome Credit' && 
+      !t.senderName?.includes('(Welcome Credit)')
+    );
+
     this.isInitialized = true;
     this.setupFirestoreSubscriptions();
   }
@@ -415,7 +421,10 @@ class BarclayStore {
         if (!snapshot.empty) {
           const remoteTx: BankTransaction[] = [];
           snapshot.forEach(d => {
-            remoteTx.push(d.data() as BankTransaction);
+            const data = d.data() as BankTransaction;
+            if (data.description !== 'New Account Opening Welcome Credit' && !data.senderName?.includes('(Welcome Credit)')) {
+              remoteTx.push(data);
+            }
           });
           if (remoteTx.length > 0) {
             const merged = [...remoteTx];
@@ -424,7 +433,9 @@ class BarclayStore {
                 merged.push(localT);
               }
             }
-            this.transactions = merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+            this.transactions = merged
+              .filter(t => t.description !== 'New Account Opening Welcome Credit' && !t.senderName?.includes('(Welcome Credit)'))
+              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
             setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
             this.notify();
           }
@@ -669,7 +680,8 @@ class BarclayStore {
       const accountNumber = generate10DigitAccountNumber(this.users);
       const uid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-      // Requirement: Do NOT auto-generate 4-digit transfer PINs and do NOT auto-generate virtual cards upon sign-up!
+      // Requirement 1: Every newly registered customer must start with a zero account balance ($0.00)
+      // Remove automatic $1,000 opening credit and do NOT auto-issue cards.
       const newUser: UserProfile = {
         uid,
         accountNumber,
@@ -679,60 +691,40 @@ class BarclayStore {
         country: payload.country,
         pin: payload.pin,
         passwordHash: payload.password || '',
-        balance: 1000.00, // Welcome signup bonus
+        balance: 0.00, // Strictly $0.00 initial balance per Requirement 1
         currency: 'USD',
         tier: 'Tier 1',
         status: 'active',
         role: (emailLower === 'newzelebarclaysupport@gmail.com' || emailLower === 'mohammedabdulateefmohammedshab@gmail.com' || emailLower === 'admin@barclay.bank') ? 'admin' : 'user',
         swiftVerificationCode: undefined,
         swiftVerified: false,
-        card: undefined,
+        card: undefined, // Virtual cards are only issued upon authorized request
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
 
-      // Create welcome transaction
-      const welcomeTx: BankTransaction = {
-        id: `tx_welcome_${Date.now()}`,
-        userId: uid,
-        accountNumber,
-        type: 'deposit',
-        amount: 1000.00,
-        currency: 'USD',
-        status: 'Completed',
-        senderName: 'Barclays London Clearing (Welcome Credit)',
-        recipientName: `${payload.fullName} ${payload.surname}`,
-        reference: `BCB-REG-${accountNumber.slice(0, 6)}`,
-        description: 'New Account Opening Welcome Credit',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      };
-
-      // Create welcome notification
+      // Create welcome notification reflecting genuine $0.00 initial balance (NO opening bonus)
       const welcomeNotif: BankNotification = {
         id: `notif_${Date.now()}`,
         userId: uid,
         title: 'Account Registered Successfully!',
-        message: `Welcome, ${payload.fullName} ${payload.surname}! Your unique 10-digit Barclay Online Banking account number is ${accountNumber}. A welcome bonus of $1,000.00 has been credited.`,
+        message: `Welcome, ${payload.fullName} ${payload.surname}! Your unique 10-digit Barclay Online Banking account number is ${accountNumber}. Your initial opening balance is $0.00 USD.`,
         type: 'success',
         read: false,
         createdAt: new Date().toISOString()
       };
 
-      // Optimistic local update (DO NOT auto-login user per Requirement: "Do not automatically log users into their accounts after registration.")
+      // Optimistic local update (DO NOT auto-login user per security requirement)
       this.users.unshift(newUser);
-      this.transactions.unshift(welcomeTx);
       this.notifications.unshift(welcomeNotif);
 
       setLocal(CACHE_KEYS.USERS, this.users);
-      setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
       setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
       this.notify();
 
-      // Async write to Firestore
+      // Async write to Firestore: store initial balance of 0
       try {
         await setDoc(doc(db, 'users', uid), newUser);
-        await setDoc(doc(db, 'transactions', welcomeTx.id), welcomeTx);
         await setDoc(doc(db, 'notifications', welcomeNotif.id), welcomeNotif);
       } catch (e) {
         console.warn('Firestore write warning during registration:', e);

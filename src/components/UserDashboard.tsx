@@ -99,9 +99,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   const [txFilter, setTxFilter] = useState<'all' | 'credit' | 'debit'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
+  const isCardIssued = !!currentUser.card;
+
   const card: CardDetails = currentUser.card || {
-    id: `card_${currentUser.uid}`,
-    cardNumber: `4532${currentUser.accountNumber.slice(0, 4)}82910384`.slice(0, 16),
+    id: `card_demo_${currentUser.uid}`,
+    cardNumber: `4552${currentUser.accountNumber.slice(0, 4)}00000000`.slice(0, 16),
     cardHolder: `${currentUser.fullName} ${currentUser.surname}`.toUpperCase(),
     expiryDate: '11/29',
     cvv: '849',
@@ -131,6 +133,27 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     navigator.clipboard.writeText(card.cardNumber);
     setCopiedCard(true);
     setTimeout(() => setCopiedCard(false), 2000);
+  };
+
+  // On-demand Genuine Card Issuance Handler per Requirement 3
+  const handleIssueCard = async () => {
+    setCardActionMsg(null);
+    setCardActionLoading(true);
+    try {
+      const res = await store.issueVirtualCard(currentUser.uid);
+      if (!res.success) {
+        setCardActionMsg({ type: 'error', text: res.error || 'Failed to issue card.' });
+      } else {
+        setCardActionMsg({
+          type: 'success',
+          text: 'Barclay Platinum Digital Debit Card successfully issued and linked to your primary account!'
+        });
+      }
+    } catch (err: any) {
+      setCardActionMsg({ type: 'error', text: err.message || 'Issuance failed.' });
+    } finally {
+      setCardActionLoading(false);
+    }
   };
 
   // Card Activation Handler
@@ -210,7 +233,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   });
 
   return (
-    <div className="min-h-screen bg-[#0A192F] text-white pb-24 font-sans">
+    <div className="min-h-screen bg-[#0A192F] text-white pb-36 font-sans">
       
       {/* Redesigned Sub-header Welcome Section (Unnecessary button collection removed per Requirement 2) */}
       <div className="bg-[#071324] border-b border-[#14233D] py-4 px-4 sm:px-6 lg:px-8">
@@ -302,28 +325,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
         {/* ================= PRIMARY DASHBOARD ROW: ACCOUNT CARD + SHORTCUTS ================= */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* Main Account Balance & Primary Card (Redesigned from IMG_4181) */}
+          {/* Main Account Balance & Primary Card (Redesigned per Requirement 2) */}
           <div className="lg:col-span-7 rounded-3xl bg-gradient-to-br from-[#0c203b] via-[#081629] to-[#040c17] border border-blue-500/40 p-6 sm:p-8 shadow-2xl relative overflow-hidden space-y-6">
             
             {/* Ambient Card Glow */}
             <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
             {/* Card Top Row: Brand & Tier Badge */}
-            <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center justify-between relative z-10 gap-2">
               <BrandLogo variant="horizontal" size="sm" />
               
               <button
                 onClick={onOpenTierUpgrade}
-                className="px-3 py-1.5 rounded-full bg-blue-950/80 hover:bg-blue-900/80 text-cyan-300 border border-blue-500/40 text-xs font-bold flex items-center gap-1.5 transition-all shadow cursor-pointer"
+                className="px-2.5 sm:px-3 py-1.5 rounded-full bg-blue-950/80 hover:bg-blue-900/80 text-cyan-300 border border-blue-500/40 text-[11px] sm:text-xs font-bold flex items-center gap-1.5 transition-all shadow shrink-0 cursor-pointer"
               >
-                <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
                 <span>{currentUser.tier} • UPGRADE</span>
               </button>
             </div>
 
             {/* 10-Digit Account Number */}
-            <div className="space-y-1 relative z-10">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <div className="space-y-1.5 relative z-10">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
                 10-DIGIT ACCOUNT NUMBER
               </span>
               <div className="flex items-center gap-3">
@@ -342,21 +365,21 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
 
             {/* Total Available Balance */}
-            <div className="space-y-1 relative z-10 pt-2 border-t border-[#142642]">
+            <div className="space-y-1.5 relative z-10 pt-2 border-t border-[#142642]">
               <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
                 <span>TOTAL AVAILABLE BALANCE</span>
                 <button
                   type="button"
                   onClick={() => setShowBalance(!showBalance)}
-                  className="text-cyan-400 hover:text-white flex items-center gap-1"
+                  className="text-cyan-400 hover:text-white flex items-center gap-1 text-[11px]"
                 >
-                  {showBalance ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  {showBalance ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                   <span>{showBalance ? 'Hide' : 'Reveal'}</span>
                 </button>
               </div>
 
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl sm:text-4xl font-black text-white font-mono tracking-tight">
+                <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
                   {showBalance 
                     ? `$${currentUser.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
                     : '••••••••••'}
@@ -365,115 +388,201 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               </div>
             </div>
 
-            {/* Cardholder & Essential Banking Shortcuts */}
-            <div className="pt-4 border-t border-[#142642] flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
-              <div>
-                <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">CARDHOLDER</span>
-                <span className="font-mono text-xs font-bold text-slate-200">{currentUser.fullName} {currentUser.surname}</span>
+            {/* Cardholder & 3 Organized Shortcuts (Full-width 3-column Grid, never clipped on mobile) */}
+            <div className="pt-4 border-t border-[#142642] space-y-4 relative z-10">
+              <div className="flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">CARDHOLDER</span>
+                  <span className="font-mono text-xs font-bold text-slate-200">{currentUser.fullName} {currentUser.surname}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">SETTLEMENT CURRENCY</span>
+                  <span className="font-mono text-xs font-bold text-cyan-400">{currentUser.currency || 'USD'} (Primary)</span>
+                </div>
               </div>
 
               {/* 3 Important Shortcuts (Requirement 2) */}
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full">
                 <button
+                  type="button"
                   onClick={onOpenDeposit}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-xs uppercase tracking-wider shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full py-2.5 px-1.5 sm:px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-black text-[11px] sm:text-xs uppercase tracking-wider shadow-md shadow-emerald-500/20 flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer active:scale-95"
                 >
-                  <ArrowDownLeft className="w-4 h-4 stroke-[2.5]" />
-                  <span>Deposit</span>
+                  <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+                  <span className="truncate">Deposit</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={onOpenTransfer}
-                  className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-cyan-500 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-blue-500/25 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full py-2.5 px-1.5 sm:px-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-cyan-500 text-white font-black text-[11px] sm:text-xs uppercase tracking-wider shadow-md shadow-blue-500/25 flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer active:scale-95"
                 >
-                  <Send className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Transfer</span>
+                  <Send className="w-3 h-3 stroke-[2.5] shrink-0" />
+                  <span className="truncate">Transfer</span>
                 </button>
 
                 <button
+                  type="button"
                   onClick={onOpenWithdrawal}
-                  className="flex-1 sm:flex-none px-3.5 py-2.5 rounded-xl bg-[#0F223D] hover:bg-[#162C4E] border border-[#1E3A5F] text-slate-200 hover:text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                  className="w-full py-2.5 px-1.5 sm:px-3 rounded-xl bg-[#0F223D] hover:bg-[#162C4E] border border-[#1E3A5F] text-slate-200 hover:text-white font-bold text-[11px] sm:text-xs uppercase tracking-wider flex items-center justify-center gap-1 sm:gap-1.5 transition-all cursor-pointer active:scale-95"
                 >
-                  <ArrowDownRight className="w-3.5 h-3.5" />
-                  <span>Withdraw</span>
+                  <ArrowDownRight className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Withdraw</span>
                 </button>
               </div>
             </div>
 
           </div>
 
-          {/* Platinum Virtual Debit Card Capsule */}
+          {/* Redesigned Premium Virtual Debit Card Capsule (Requirement 3) */}
           <div className="lg:col-span-5 rounded-3xl bg-[#001428] border border-[#00284d] p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-cyan-400" />
                 <h3 className="text-sm font-extrabold text-white">Barclay Platinum Card</h3>
               </div>
+              
+              {/* Neatly Positioned Card Status Badge (Requirement 3) */}
               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                card.status === 'active'
+                !isCardIssued
+                  ? 'bg-purple-950/80 text-purple-300 border border-purple-700/60'
+                  : card.status === 'active'
                   ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
                   : card.status === 'frozen'
                   ? 'bg-blue-950 text-blue-300 border border-blue-800'
                   : 'bg-amber-950 text-amber-400 border border-amber-800'
               }`}>
-                {card.status}
+                {!isCardIssued ? 'DEMO (UNISSUED)' : card.status.toUpperCase()}
               </span>
             </div>
 
-            {/* Virtual Card Graphic */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0e274a] via-[#091930] to-[#040c17] border border-blue-500/30 space-y-4 shadow-lg">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-mono font-black text-slate-300 tracking-widest">PLATINUM DEBIT</span>
-                <Zap className="w-4 h-4 text-cyan-400" />
+            {/* Premium Dark-Mode Realistic Virtual Card Graphic (Requirement 3) */}
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0c1f38] via-[#071324] to-[#02070f] border border-slate-700/60 space-y-4 shadow-2xl relative overflow-hidden group">
+              {/* Metallic Sheen Overlay */}
+              <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 via-transparent to-white/5 pointer-events-none" />
+
+              {/* Card Top Row: Chip, Contactless Symbol, and Card Network Branding */}
+              <div className="flex items-center justify-between relative z-10">
+                <div className="flex items-center gap-2.5">
+                  {/* Realistic Metallic Gold EMV Chip */}
+                  <div className="w-10 h-7 rounded bg-gradient-to-tr from-amber-200 via-amber-400 to-amber-600 border border-amber-300/80 p-0.5 shadow-md">
+                    <div className="w-full h-full border border-amber-800/40 rounded-sm grid grid-cols-2 gap-0.5">
+                      <div className="border-r border-b border-amber-800/40" />
+                      <div className="border-b border-amber-800/40" />
+                      <div className="border-r border-amber-800/40" />
+                      <div />
+                    </div>
+                  </div>
+
+                  {/* Contactless Wave Icon */}
+                  <div className="text-slate-400">
+                    <svg className="w-4 h-4 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <path d="M5 8a10 10 0 0 1 14 0" />
+                      <path d="M8 11a6 6 0 0 1 8 0" />
+                      <path d="M11 14a2 2 0 0 1 2 0" />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Authorized Network Branding */}
+                <div className="text-right">
+                  <span className="font-mono text-[10px] font-black tracking-widest text-cyan-300 block">
+                    BARCLAYCARD
+                  </span>
+                  <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
+                    PLATINUM DEBIT
+                  </span>
+                </div>
               </div>
 
-              {/* EMV Chip */}
-              <div className="w-10 h-7 rounded bg-gradient-to-tr from-amber-300 to-amber-500 border border-amber-200/50 shadow-inner flex items-center justify-center">
-                <div className="w-6 h-4 border border-amber-800/40 rounded-sm" />
+              {/* Masked Card Number with Reveal Toggle (Requirement 3: •••• •••• •••• 1234) */}
+              <div className="relative z-10 pt-1">
+                <div className="flex items-center justify-between">
+                  <p className="font-mono text-base sm:text-lg font-black tracking-widest text-white text-shadow-sm">
+                    {!isCardIssued
+                      ? '•••• •••• •••• 0000'
+                      : formatCardNumber(card.cardNumber, showCardNumber)}
+                  </p>
+                  {isCardIssued && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCardNumber(!showCardNumber)}
+                      className="text-slate-400 hover:text-white p-1 transition-colors"
+                      title={showCardNumber ? 'Mask card number' : 'Reveal card number'}
+                    >
+                      {showCardNumber ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              {/* Card Number */}
-              <div>
-                <p className="font-mono text-base font-black tracking-widest text-white">
-                  {formatCardNumber(card.cardNumber, showCardNumber)}
+              {/* Cardholder, Expiry Date & CVV */}
+              <div className="flex items-center justify-between text-[10px] font-mono pt-2 border-t border-[#142642] relative z-10">
+                <div>
+                  <span className="text-[8px] text-slate-400 uppercase tracking-wider block font-sans">Cardholder</span>
+                  <span className="text-slate-200 font-bold truncate max-w-[130px] block">
+                    {card.cardHolder}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[8px] text-slate-400 uppercase tracking-wider block font-sans">Expires</span>
+                  <span className="text-cyan-300 font-bold">
+                    {!isCardIssued ? '11/29' : card.expiryDate}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[8px] text-slate-400 uppercase tracking-wider block font-sans">CVV</span>
+                  <span className="text-white font-bold">
+                    {!isCardIssued ? '•••' : (showCardNumber ? card.cvv : '•••')}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Card Actions: Genuine Issuance or Active Controls */}
+            {!isCardIssued ? (
+              <div className="space-y-2 pt-1">
+                <button
+                  onClick={handleIssueCard}
+                  disabled={cardActionLoading}
+                  className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                >
+                  <Zap className="w-4 h-4 fill-white" />
+                  <span>{cardActionLoading ? 'Processing EMV Issuance...' : 'Request Genuine Virtual Card'}</span>
+                </button>
+                <p className="text-[10px] text-slate-400 text-center">
+                  Simulated preview shown above. Card will be officially activated upon request.
                 </p>
               </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
+                {card.status === 'inactive' ? (
+                  <button
+                    onClick={() => setActivationModalOpen(true)}
+                    className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-center transition-colors shadow"
+                  >
+                    Activate Card
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleToggleFreeze}
+                    disabled={cardActionLoading}
+                    className="py-2.5 px-3 rounded-xl bg-[#001f3d] hover:bg-[#002f5c] border border-[#003866] text-slate-200 hover:text-white font-semibold text-center transition-colors flex items-center justify-center gap-1.5 active:scale-95"
+                  >
+                    <Snowflake className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>{card.status === 'frozen' ? 'Unfreeze' : 'Freeze Card'}</span>
+                  </button>
+                )}
 
-              <div className="flex items-center justify-between text-[10px] font-mono pt-2 border-t border-[#142642]">
-                <span className="text-slate-300">{card.cardHolder}</span>
-                <span className="text-cyan-300">{card.expiryDate}</span>
-                <span className="text-white font-bold">{showCardNumber ? card.cvv : '•••'}</span>
+                <button
+                  onClick={() => setPaymentMethodsModalOpen(true)}
+                  className="py-2.5 px-3 rounded-xl bg-[#00172e] hover:bg-[#002040] border border-[#00284d] text-cyan-300 font-bold text-center transition-colors flex items-center justify-center gap-1 active:scale-95"
+                >
+                  <span>Gateways</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
-            </div>
-
-            {/* Card Quick Actions */}
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              {card.status === 'inactive' ? (
-                <button
-                  onClick={() => setActivationModalOpen(true)}
-                  className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-center transition-colors"
-                >
-                  Activate Card
-                </button>
-              ) : (
-                <button
-                  onClick={handleToggleFreeze}
-                  disabled={cardActionLoading}
-                  className="py-2.5 px-3 rounded-xl bg-[#001f3d] hover:bg-[#002f5c] border border-[#003866] text-slate-200 hover:text-white font-semibold text-center transition-colors flex items-center justify-center gap-1.5"
-                >
-                  <Snowflake className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>{card.status === 'frozen' ? 'Unfreeze' : 'Freeze'}</span>
-                </button>
-              )}
-
-              <button
-                onClick={() => setPaymentMethodsModalOpen(true)}
-                className="py-2.5 px-3 rounded-xl bg-[#00172e] hover:bg-[#002040] border border-[#00284d] text-cyan-300 font-bold text-center transition-colors flex items-center justify-center gap-1"
-              >
-                <span>Payment Gateways</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+            )}
           </div>
 
         </div>
