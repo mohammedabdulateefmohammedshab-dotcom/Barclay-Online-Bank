@@ -21,7 +21,7 @@ interface HeaderProps {
   currentUser: UserProfile | null;
   isAdminMode: boolean;
   onOpenAuth: (mode: 'login' | 'register') => void;
-  onOpenAdminAuth: () => void;
+  onOpenAdminAuth?: () => void;
   onLogout: () => void;
   onToggleAdminView: () => void;
   unreadNotificationsCount: number;
@@ -40,6 +40,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenAuth,
   onOpenAdminAuth,
   onLogout,
+  onToggleAdminView,
   unreadNotificationsCount,
   onOpenNotifications,
   currentLang,
@@ -260,7 +261,7 @@ export const Header: React.FC<HeaderProps> = ({
                     {currentUser.role === 'admin' && (
                       <button
                         onClick={() => {
-                          onOpenAdminAuth();
+                          onToggleAdminView();
                           setUserMenuOpen(false);
                         }}
                         className="w-full px-4 py-2.5 text-left hover:bg-[#002244] text-cyan-300 flex items-center gap-2.5 border-t border-[#1E293B]"
@@ -339,7 +340,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           {currentUser?.role === 'admin' && (
             <button
-              onClick={() => { onOpenAdminAuth(); setMobileMenuOpen(false); }}
+              onClick={() => { onToggleAdminView(); setMobileMenuOpen(false); }}
               className="w-full text-left py-2 px-3 rounded-lg text-sm font-semibold text-cyan-300 hover:bg-[#002244] flex items-center gap-2"
             >
               <ShieldCheck className="w-4 h-4 text-cyan-400" />

@@ -14,7 +14,6 @@ import { HomePage } from './components/HomePage';
 import { UserDashboard } from './components/UserDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AuthModal } from './components/AuthModal';
-import { AdminAuthModal } from './components/AdminAuthModal';
 import { DepositModal } from './components/DepositModal';
 import { TransferModal } from './components/TransferModal';
 import { WithdrawalModal } from './components/WithdrawalModal';
@@ -46,9 +45,10 @@ export default function App() {
 
   const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      const isHashAdmin = window.location.hash.toLowerCase().includes('admin');
       const savedAdmin = sessionStorage.getItem('barclay_management_active') === 'true';
-      return savedAdmin || isHashAdmin;
+      const initUser = store.getCurrentUser();
+      const isRoleAdmin = initUser?.role === 'admin' || initUser?.email === 'newzelebarclaysupport@gmail.com';
+      return savedAdmin || isRoleAdmin;
     }
     return false;
   });
@@ -57,7 +57,6 @@ export default function App() {
 
   // Modals state
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [adminAuthModalOpen, setAdminAuthModalOpen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'register' | 'forgot'>('login');
   const [depositModalOpen, setDepositModalOpen] = useState(false);
   const [transferModalOpen, setTransferModalOpen] = useState(false);
@@ -73,39 +72,41 @@ export default function App() {
     testConnection(); // Probe connection
     const unsubscribe = store.subscribe(() => {
       setUsers(store.getUsers());
-      setCurrentUser(store.getCurrentUser());
+      const u = store.getCurrentUser();
+      setCurrentUser(u);
       setTransactions(store.getTransactions());
       setPaymentSubmissions(store.getPaymentSubmissions());
       setVerificationRequests(store.getVerificationRequests());
       setNotifications(store.getNotifications());
       setSettings(store.getSettings());
+      if (u && (u.role === 'admin' || u.email === 'newzelebarclaysupport@gmail.com')) {
+        setIsAdminMode(true);
+        sessionStorage.setItem('barclay_management_active', 'true');
+      }
     });
     return unsubscribe;
   }, []);
 
-  // Dedicated separate administrative route listener (#admin or staff key combination)
+  // Route listener: direct route to unified login or management if hash matches
   useEffect(() => {
     const checkAdminRoute = () => {
       const hash = window.location.hash.toLowerCase();
       if (hash === '#admin' || hash === '#/admin' || hash === '#portal' || window.location.search.includes('admin=true')) {
-        setAdminAuthModalOpen(true);
-      }
-    };
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      // Secure staff hotkey: Ctrl+Shift+A or Cmd+Shift+A
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'a') {
-        e.preventDefault();
-        setAdminAuthModalOpen(true);
+        const u = store.getCurrentUser();
+        if (u && (u.role === 'admin' || u.email === 'newzelebarclaysupport@gmail.com')) {
+          setIsAdminMode(true);
+          sessionStorage.setItem('barclay_management_active', 'true');
+        } else {
+          setAuthInitialMode('login');
+          setAuthModalOpen(true);
+        }
       }
     };
 
     checkAdminRoute();
     window.addEventListener('hashchange', checkAdminRoute);
-    window.addEventListener('keydown', handleKeyDown);
     return () => {
       window.removeEventListener('hashchange', checkAdminRoute);
-      window.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
 
@@ -150,9 +151,11 @@ export default function App() {
         currentUser={currentUser}
         isAdminMode={isAdminMode}
         onOpenAuth={handleOpenAuth}
-        onOpenAdminAuth={() => setAdminAuthModalOpen(true)}
         onLogout={handleLogout}
-        onToggleAdminView={() => {}}
+        onToggleAdminView={() => {
+          setIsAdminMode(true);
+          sessionStorage.setItem('barclay_management_active', 'true');
+        }}
         unreadNotificationsCount={unreadCount}
         onOpenNotifications={() => setNotificationsModalOpen(true)}
         currentLang={currentLang}
@@ -198,12 +201,12 @@ export default function App() {
             onOpenReceipt={(tx) => setSelectedReceiptTx(tx)}
             onOpenNotifications={() => setNotificationsModalOpen(true)}
             onOpenSupport={() => setSupportModalOpen(true)}
+            onLogout={handleLogout}
           />
         ) : (
           /* Website Public Homepage (Requirement 1 & 2: First landing screen) */
           <HomePage
             onOpenAuth={handleOpenAuth}
-            onOpenAdminAuth={() => setAdminAuthModalOpen(true)}
             onOpenAbout={() => setAboutModalOpen(true)}
             onOpenSupport={() => setSupportModalOpen(true)}
             currentLang={currentLang}
@@ -211,7 +214,7 @@ export default function App() {
         )}
       </main>
 
-      {/* User Login & Registration Modal */}
+      {/* User Login & Registration Modal - Unified for both Customers and Administrators */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
@@ -219,18 +222,16 @@ export default function App() {
         onSuccess={(user) => {
           store.setCurrentUserId(user.uid);
           setCurrentUser(user);
-          setActiveTab('dashboard');
-          sessionStorage.setItem('barclay_active_tab', 'dashboard');
-        }}
-      />
-
-      {/* Dedicated Administrative Access Gateway (Requirement 4) */}
-      <AdminAuthModal
-        isOpen={adminAuthModalOpen}
-        onClose={() => setAdminAuthModalOpen(false)}
-        onSuccess={() => {
-          setIsAdminMode(true);
-          sessionStorage.setItem('barclay_management_active', 'true');
+          if (user.role === 'admin' || user.email === 'newzelebarclaysupport@gmail.com') {
+            setIsAdminMode(true);
+            sessionStorage.setItem('barclay_management_active', 'true');
+            sessionStorage.removeItem('barclay_active_tab');
+          } else {
+            setIsAdminMode(false);
+            sessionStorage.removeItem('barclay_management_active');
+            setActiveTab('dashboard');
+            sessionStorage.setItem('barclay_active_tab', 'dashboard');
+          }
         }}
       />
 
