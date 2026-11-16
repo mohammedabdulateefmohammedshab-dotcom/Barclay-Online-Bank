@@ -41,13 +41,13 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
   };
 
   // Requirement 4: Remove all default Welcome Credit descriptions and sanitize
-  const cleanSenderName = (transaction.senderName || 'Barclays Clearing London')
+  const cleanSenderName = (transaction.senderName || 'Aegis Central Clearing London')
     .replace(/\(Welcome Credit\)/gi, '')
     .trim();
 
   let cleanDescription = transaction.description || 'Core Banking Liquidity Settlement';
   if (cleanDescription.toLowerCase().includes('welcome credit') || cleanDescription.toLowerCase().includes('opening welcome')) {
-    cleanDescription = 'Initial Direct Account Deposit Settlement';
+    cleanDescription = 'Direct Account Deposit Settlement';
   }
 
   // Requirement 4: Clearly mark sample receipts as SAMPLE or DEMO
@@ -70,7 +70,7 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
         };
       case 'Pending':
         return {
-          label: 'PENDING BARCLAY REVIEW',
+          label: 'PENDING AEGIS REVIEW',
           bg: 'bg-amber-50 border-amber-500 text-amber-950',
           badgeBg: 'bg-amber-600 text-white',
           desc: 'Transaction is currently awaiting central clearance review and verification.',
@@ -142,7 +142,7 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
           {/* Subtle Security Watermark */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.025] select-none">
             <span className="font-extrabold text-7xl uppercase tracking-widest text-slate-900 rotate-[-30deg]">
-              BARCLAY BANK
+              AEGIS BANK
             </span>
           </div>
 
@@ -183,17 +183,17 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
             <div className="pt-3 border-t border-slate-200 text-xs text-slate-600 space-y-1">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                 <p className="font-bold text-slate-900">
-                  Barclay Online Bank PLC • Central Clearing & Settlement
+                  Aegis Online Bank PLC • Central Clearing & Settlement
                 </p>
                 <span className="text-[11px] font-mono text-slate-500">
                   Date: {formattedDate}
                 </span>
               </div>
               <p className="text-[11px] text-slate-600">
-                Head Office: 1 Churchill Place, Canary Wharf, London, E14 5HP, United Kingdom
+                Central Operations: Aegis Global Financial Center, London & International Clearings
               </p>
               <p className="text-[10px] text-slate-500 leading-relaxed">
-                Regulated by the Prudential Regulation Authority (PRA) and the Financial Conduct Authority (FCA). Registered in England and Wales.
+                Operating secure international digital accounts, encrypted multi-currency settlement ledgers, and priority treasury clearance.
               </p>
             </div>
           </div>
@@ -246,7 +246,7 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
                     {transaction.accountNumber || transaction.senderAccountNumber || '8344338188'}
                   </p>
                   <p className="text-[11px] text-slate-600">
-                    Debiting Institution: <strong>Barclay Online Bank PLC (UK)</strong>
+                    Debiting Institution: <strong>Aegis Online Bank PLC</strong>
                   </p>
                 </div>
               </div>
@@ -268,7 +268,7 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
                   <div>
                     <span className="text-[10px] text-slate-500 uppercase block font-semibold">Beneficiary Bank</span>
                     <p className="font-semibold text-slate-900 text-xs">
-                      {transaction.recipientBank || 'Barclay Online Bank'}
+                      {transaction.recipientBank || 'Aegis Online Bank'}
                     </p>
                   </div>
                 </div>
@@ -377,7 +377,7 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
                   VERIFIED ELECTRONIC ADVICE
                 </p>
                 <p className="text-[10px] text-slate-500">
-                  Cryptographically authenticated and settled by Barclay Global Core Clearing
+                  Cryptographically authenticated and settled by Aegis Global Core Clearing
                 </p>
               </div>
             </div>
@@ -385,7 +385,7 @@ export const TransactionReceiptModal: React.FC<TransactionReceiptModalProps> = (
             {/* Official Stamp / Seal */}
             <div className="border-2 border-dashed border-[#00264d] px-3.5 py-2 rounded-xl text-center select-none bg-slate-50/50 transform -rotate-1 self-start sm:self-auto">
               <span className="text-[10px] uppercase font-black text-[#00264d] tracking-widest block">
-                BARCLAY CLEARING PLC
+                AEGIS CLEARING PLC
               </span>
               <span className="text-[9px] font-mono font-bold text-slate-600 block">
                 CLEARANCE AUTH: {transaction.id.slice(0, 10).toUpperCase()}

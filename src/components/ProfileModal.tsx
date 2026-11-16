@@ -104,7 +104,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
               <span>Identity Protection & KYC Compliance</span>
             </div>
             <p className="text-[11px] text-slate-400 leading-relaxed">
-              Your profile is protected under strict zero-trust digital custody guidelines. To request changes to your primary legal name or registered country, contact the Barclay Support Center.
+              Your profile is protected under strict zero-trust digital custody guidelines. To request changes to your primary legal name or registered country, contact the Aegis Support Center.
             </p>
           </div>
 

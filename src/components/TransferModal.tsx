@@ -39,10 +39,10 @@ export const TransferModal: React.FC<TransferModalProps> = ({
   onRequestSwiftCode
 }) => {
   const [selectedCountryName, setSelectedCountryName] = useState('United Kingdom');
-  const [recipientBank, setRecipientBank] = useState('Barclays Bank UK');
+  const [recipientBank, setRecipientBank] = useState('HSBC UK');
   const [recipientName, setRecipientName] = useState('');
   const [recipientAccountNumber, setRecipientAccountNumber] = useState('');
-  const [swiftCode, setSwiftCode] = useState('BARCGB22');
+  const [swiftCode, setSwiftCode] = useState('HBUKGB41');
   const [amount, setAmount] = useState('');
   const [description, setDescription] = useState('');
   const [verificationCode, setVerificationCode] = useState('');

@@ -37,7 +37,7 @@ export default function App() {
 
   // Navigation & View Mode: Persistent across page refreshes per Requirement 3
   const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>(() => {
-    const saved = typeof window !== 'undefined' ? sessionStorage.getItem('barclay_active_tab') : null;
+    const saved = typeof window !== 'undefined' ? sessionStorage.getItem('aegis_active_tab') : null;
     if (saved === 'dashboard') return 'dashboard';
     const initUser = store.getCurrentUser();
     return initUser ? 'dashboard' : 'home';
@@ -45,7 +45,7 @@ export default function App() {
 
   const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
-      const savedAdmin = sessionStorage.getItem('barclay_management_active') === 'true';
+      const savedAdmin = sessionStorage.getItem('aegis_management_active') === 'true';
       const initUser = store.getCurrentUser();
       const isRoleAdmin = initUser?.role === 'admin' || initUser?.email === 'newzelebarclaysupport@gmail.com';
       return savedAdmin || isRoleAdmin;
@@ -81,7 +81,7 @@ export default function App() {
       setSettings(store.getSettings());
       if (u && (u.role === 'admin' || u.email === 'newzelebarclaysupport@gmail.com')) {
         setIsAdminMode(true);
-        sessionStorage.setItem('barclay_management_active', 'true');
+        sessionStorage.setItem('aegis_management_active', 'true');
       }
     });
     return unsubscribe;
@@ -95,7 +95,7 @@ export default function App() {
         const u = store.getCurrentUser();
         if (u && (u.role === 'admin' || u.email === 'newzelebarclaysupport@gmail.com')) {
           setIsAdminMode(true);
-          sessionStorage.setItem('barclay_management_active', 'true');
+          sessionStorage.setItem('aegis_management_active', 'true');
         } else {
           setAuthInitialMode('login');
           setAuthModalOpen(true);
@@ -127,8 +127,8 @@ export default function App() {
   };
 
   const handleLogout = () => {
-    sessionStorage.removeItem('barclay_active_tab');
-    sessionStorage.removeItem('barclay_management_active');
+    sessionStorage.removeItem('aegis_active_tab');
+    sessionStorage.removeItem('aegis_management_active');
     store.setCurrentUserId(null);
     setCurrentUser(null);
     setActiveTab('home');
@@ -144,7 +144,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A192F] font-sans antialiased text-slate-100 flex flex-col selection:bg-blue-500 selection:text-white">
+    <div className="min-h-screen bg-[#0b0d13] font-sans antialiased text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
       
       {/* Universal Header */}
       <Header
@@ -154,7 +154,7 @@ export default function App() {
         onLogout={handleLogout}
         onToggleAdminView={() => {
           setIsAdminMode(true);
-          sessionStorage.setItem('barclay_management_active', 'true');
+          sessionStorage.setItem('aegis_management_active', 'true');
         }}
         unreadNotificationsCount={unreadCount}
         onOpenNotifications={() => setNotificationsModalOpen(true)}
@@ -165,9 +165,9 @@ export default function App() {
         activeTab={isAdminMode ? 'admin' : activeTab}
         onSelectTab={(tab) => {
           setIsAdminMode(false);
-          sessionStorage.removeItem('barclay_management_active');
+          sessionStorage.removeItem('aegis_management_active');
           setActiveTab(tab as any);
-          sessionStorage.setItem('barclay_active_tab', tab);
+          sessionStorage.setItem('aegis_active_tab', tab);
         }}
       />
 
@@ -183,7 +183,7 @@ export default function App() {
             settings={settings}
             onViewReceipt={(tx) => setSelectedReceiptTx(tx)}
             onExitAdmin={() => {
-              sessionStorage.removeItem('barclay_management_active');
+              sessionStorage.removeItem('aegis_management_active');
               setIsAdminMode(false);
               setActiveTab('home');
             }}
@@ -224,13 +224,13 @@ export default function App() {
           setCurrentUser(user);
           if (user.role === 'admin' || user.email === 'newzelebarclaysupport@gmail.com') {
             setIsAdminMode(true);
-            sessionStorage.setItem('barclay_management_active', 'true');
-            sessionStorage.removeItem('barclay_active_tab');
+            sessionStorage.setItem('aegis_management_active', 'true');
+            sessionStorage.removeItem('aegis_active_tab');
           } else {
             setIsAdminMode(false);
-            sessionStorage.removeItem('barclay_management_active');
+            sessionStorage.removeItem('aegis_management_active');
             setActiveTab('dashboard');
-            sessionStorage.setItem('barclay_active_tab', 'dashboard');
+            sessionStorage.setItem('aegis_active_tab', 'dashboard');
           }
         }}
       />

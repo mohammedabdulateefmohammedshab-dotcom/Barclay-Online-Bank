@@ -107,11 +107,11 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     cardHolder: `${currentUser.fullName} ${currentUser.surname}`.toUpperCase(),
     expiryDate: '11/29',
     cvv: '849',
-    cardType: 'Barclay Platinum Digital Debit',
-    brand: 'barclay',
+    cardType: 'Aegis Platinum Digital Debit',
+    brand: 'aegis',
     status: 'inactive',
     activationCode: currentUser.pin || '1234',
-    issuerName: 'Barclay Card Services & Global Clearing Gateway',
+    issuerName: 'Aegis Card Services & Global Clearing Gateway',
     dailyLimit: 2500,
     monthlyLimit: 25000,
     issuedAt: currentUser.createdAt,
@@ -146,7 +146,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       } else {
         setCardActionMsg({
           type: 'success',
-          text: 'Barclay Platinum Digital Debit Card successfully issued and linked to your primary account!'
+          text: 'Aegis Platinum Digital Debit Card successfully issued and linked to your primary account!'
         });
       }
     } catch (err: any) {
@@ -167,7 +167,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       if (!res.success) {
         setCardActionMsg({ type: 'error', text: res.error || 'Failed to activate card.' });
       } else {
-        setCardActionMsg({ type: 'success', text: 'Card activated successfully with Barclay Issuer clearance!' });
+        setCardActionMsg({ type: 'success', text: 'Card activated successfully with Aegis Issuer clearance!' });
         setActivationModalOpen(false);
         setActivationCodeInput('');
       }
@@ -439,7 +439,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-extrabold text-white">Barclay Platinum Card</h3>
+                <h3 className="text-sm font-extrabold text-white">Aegis Platinum Card</h3>
               </div>
               
               {/* Neatly Positioned Card Status Badge (Requirement 3) */}
@@ -487,7 +487,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 {/* Authorized Network Branding */}
                 <div className="text-right">
                   <span className="font-mono text-[10px] font-black tracking-widest text-cyan-300 block">
-                    BARCLAYCARD
+                    AEGIS PLATINUM
                   </span>
                   <span className="text-[8px] font-bold uppercase tracking-wider text-slate-400">
                     PLATINUM DEBIT

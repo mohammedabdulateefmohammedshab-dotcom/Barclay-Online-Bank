@@ -91,7 +91,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         method: activeTab === 'wire' ? 'Bank_Wire' : method,
         amount: numAmount,
         txHashOrRef: proofTxHash,
-        proofImageUrl: proofImage || 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=400&auto=format&fit=crop&q=80',
+        proofImageUrl: proofImage || '',
         notes: proofNotes
       });
 
@@ -270,7 +270,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   <span>I Have Made the Payment</span>
                 </button>
                 <p className="text-[11px] text-center text-slate-400 mt-2">
-                  Click after sending crypto to submit your transaction hash and receipt proof for rapid admin approval.
+                  Click after sending crypto to submit your transaction hash and receipt proof for review by the authorized payment verification team.
                 </p>
               </div>
             </div>
@@ -280,21 +280,21 @@ export const DepositModal: React.FC<DepositModalProps> = ({
               <div className="p-4 rounded-xl bg-[#001f3d] border border-[#003866] space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wide">
                   <Building2 className="w-4 h-4" />
-                  <span>Barclays Official Clearing Bank Coordinates</span>
+                  <span>Aegis Official Clearing Bank Coordinates</span>
                 </div>
 
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
                     <span className="text-slate-400">Beneficiary Bank:</span>
-                    <span className="font-semibold text-white">Barclays Bank PLC UK</span>
+                    <span className="font-semibold text-white">Aegis Clearing Bank (UK)</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
                     <span className="text-slate-400">Headquarters Address:</span>
-                    <span className="font-semibold text-white">1 Churchill Place, London E14 5HP, UK</span>
+                    <span className="font-semibold text-white">Aegis Financial Center, London EC2M, UK</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
                     <span className="text-slate-400">SWIFT / BIC Code:</span>
-                    <span className="font-mono font-bold text-cyan-300">BARCGB22</span>
+                    <span className="font-mono font-bold text-cyan-300">AEGSGB2L</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
                     <span className="text-slate-400">Sort Code:</span>
@@ -306,7 +306,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   </div>
                   <div className="flex justify-between py-1.5">
                     <span className="text-slate-400">Mandatory Payment Reference:</span>
-                    <span className="font-mono font-bold text-amber-300">BCB-{currentUser.accountNumber}</span>
+                    <span className="font-mono font-bold text-amber-300">AEG-{currentUser.accountNumber}</span>
                   </div>
                 </div>
               </div>

@@ -2,7 +2,7 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "Registered Barclay Online Bank customer profile",
+      "description": "Registered Aegis Online Bank customer profile",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "maxLength": 128 },
@@ -21,6 +21,19 @@
         "updatedAt": { "type": "string", "maxLength": 50 }
       },
       "required": ["uid", "accountNumber", "fullName", "surname", "email", "country", "pin", "balance", "tier"]
+    },
+    "AccountNumberIndex": {
+      "title": "AccountNumberIndex",
+      "description": "10-digit account number index for fast user lookup",
+      "type": "object",
+      "properties": {
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 150 },
+        "fullName": { "type": "string", "maxLength": 200 },
+        "createdAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["accountNumber", "uid", "email"]
     },
     "Transaction": {
       "title": "Transaction",
@@ -107,6 +120,20 @@
       },
       "required": ["id", "userId", "title", "message", "type", "read", "createdAt"]
     },
+    "AdminAuditLog": {
+      "title": "AdminAuditLog",
+      "description": "Immutable bank ledger audit logs for compliance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "adminEmail": { "type": "string", "maxLength": 150 },
+        "action": { "type": "string", "maxLength": 100 },
+        "targetAccount": { "type": "string", "maxLength": 50 },
+        "details": { "type": "string", "maxLength": 1000 },
+        "timestamp": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "adminEmail", "action", "details", "timestamp"]
+    },
     "FinancialSettings": {
       "title": "FinancialSettings",
       "description": "Configurable global bank settings, limits, fees, and cryptocurrency addresses",
@@ -132,7 +159,11 @@
   "firestore": {
     "/users/{userId}": {
       "schema": "User",
-      "description": "Barclay user bank profiles"
+      "description": "Aegis customer bank profiles"
+    },
+    "/account_numbers/{accountNumber}": {
+      "schema": "AccountNumberIndex",
+      "description": "10-digit account number index for fast user lookup"
     },
     "/transactions/{transactionId}": {
       "schema": "Transaction",
@@ -149,6 +180,10 @@
     "/notifications/{notificationId}": {
       "schema": "Notification",
       "description": "User notification messages"
+    },
+    "/audit_logs/{logId}": {
+      "schema": "AdminAuditLog",
+      "description": "Central bank compliance audit trails"
     },
     "/settings/financial": {
       "schema": "FinancialSettings",

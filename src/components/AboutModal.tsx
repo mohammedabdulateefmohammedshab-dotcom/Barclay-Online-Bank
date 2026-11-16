@@ -19,8 +19,8 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
           <div className="flex items-center gap-3">
             <BrandLogo variant="horizontal" size="sm" />
             <div>
-              <h3 className="text-sm font-extrabold text-white">About Barclay Online Bank</h3>
-              <p className="text-[10px] text-cyan-400">Canary Wharf, London • Established Excellence</p>
+              <h3 className="text-sm font-extrabold text-white">About Aegis Online Bank</h3>
+              <p className="text-[10px] text-cyan-400">Independent Financial Platform • Established Excellence</p>
             </div>
           </div>
 
@@ -39,7 +39,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
               <span>A Legacy of Sovereign Security & Global Liquidity</span>
             </h4>
             <p>
-              Barclay Online Bank is a premier international private and commercial digital banking institution. Headquartered at 1 Churchill Place, Canary Wharf, London, we combine the heritage of British high finance with next-generation automated cryptographic settlements.
+              Aegis Online Bank is a premier international private and commercial digital banking platform. We combine institutional-grade high finance standards with next-generation automated cryptographic settlements and secure global treasury management.
             </p>
           </div>
 
@@ -79,7 +79,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({ isOpen, onClose }) => {
 
           <div className="border-t border-[#002b52] pt-3 text-[11px] text-slate-400">
             <p>
-              Barclay Online Bank PLC is authorized by the Prudential Regulation Authority and regulated by the Financial Conduct Authority. Registered in England & Wales. No. 1026167.
+              Aegis Online Bank PLC operates secure digital multi-currency accounts and treasury operations.
             </p>
           </div>
         </div>

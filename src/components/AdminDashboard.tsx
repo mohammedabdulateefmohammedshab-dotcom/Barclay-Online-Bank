@@ -78,11 +78,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   
   // Deposit funds form state (Requirement 3)
   const [depositAmount, setDepositAmount] = useState('');
-  const [depositSenderName, setDepositSenderName] = useState('Barclays Clearing London');
+  const [depositSenderName, setDepositSenderName] = useState('Aegis Clearing London');
   const [depositNote, setDepositNote] = useState('');
   const [depositLoading, setDepositLoading] = useState(false);
   const [depositSuccessMsg, setDepositSuccessMsg] = useState('');
   const [depositErrorMsg, setDepositErrorMsg] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Financial Settings form state (Requirement 10)
   const [formData, setFormData] = useState<FinancialSettings>(settings);
@@ -110,16 +111,40 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     }
   }, [users]);
 
-  // Instant customer search by 10-digit account number (Requirement 3)
+  // Real-time filtered users for search by Account Number, Email, or Name
+  const filteredUsers = useMemo(() => {
+    const clean = searchAccountInput.trim().toLowerCase();
+    if (!clean) return users;
+    return users.filter(u => 
+      u.accountNumber.includes(clean) ||
+      u.email.toLowerCase().includes(clean) ||
+      `${u.fullName} ${u.surname}`.toLowerCase().includes(clean) ||
+      u.country.toLowerCase().includes(clean)
+    );
+  }, [users, searchAccountInput]);
+
+  // Force Instant Refresh from Firestore for Real-Time Sync
+  const handleForceSync = async () => {
+    setIsSyncing(true);
+    try {
+      await store.syncFromFirestoreNow();
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  // Instant customer search by 10-digit account number or email
   const handleSearchCustomer = (input: string) => {
     setSearchAccountInput(input);
-    const clean = input.trim();
+    const clean = input.trim().toLowerCase();
     if (!clean) return;
 
     const found = users.find(u => 
       u.accountNumber === clean || 
-      u.email.toLowerCase().includes(clean.toLowerCase()) ||
-      `${u.fullName} ${u.surname}`.toLowerCase().includes(clean.toLowerCase())
+      u.email.toLowerCase() === clean ||
+      u.accountNumber.includes(clean) ||
+      u.email.toLowerCase().includes(clean) ||
+      `${u.fullName} ${u.surname}`.toLowerCase().includes(clean)
     );
 
     if (found) {
@@ -502,42 +527,60 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                     type="text"
                     value={searchAccountInput}
                     onChange={(e) => handleSearchCustomer(e.target.value)}
-                    placeholder="Enter 10-digit Account Number (e.g. 4829103847)..."
+                    placeholder="Search by 10-digit Account Number, Email, or Name..."
                     className="w-full bg-[#001020] border border-[#003866] rounded-xl pl-9 pr-3 py-2.5 text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:border-cyan-400"
                   />
                 </div>
 
                 {/* Quick Selection List of Registered Users */}
                 <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    All Registered Customer Accounts ({users.length}):
-                  </span>
-                  {users.map(u => (
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                      {searchAccountInput.trim() ? `Search Results (${filteredUsers.length} of ${users.length}):` : `All Registered Customer Accounts (${users.length}):`}
+                    </span>
                     <button
-                      key={u.uid}
                       type="button"
-                      onClick={() => {
-                        setSelectedUser(u);
-                        setSearchAccountInput(u.accountNumber);
-                      }}
-                      className={`w-full p-3 rounded-xl border text-left transition-all ${
-                        selectedUser?.uid === u.uid
-                          ? 'bg-[#00264d] border-cyan-400 shadow-md shadow-cyan-500/10'
-                          : 'bg-[#001326] border-[#002447] hover:border-slate-500'
-                      }`}
+                      onClick={handleForceSync}
+                      disabled={isSyncing}
+                      className="text-[10px] text-cyan-400 hover:text-cyan-300 font-bold flex items-center gap-1 transition-colors disabled:opacity-50"
+                      title="Force real-time sync with Firestore database"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-xs text-white">{u.fullName} {u.surname}</span>
-                        <span className="font-mono text-xs font-black text-cyan-300">{u.accountNumber}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
-                        <span>{u.country} • {u.tier}</span>
-                        <span className="font-mono font-bold text-emerald-400">
-                          ${u.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                        </span>
-                      </div>
+                      <RefreshCw className={`w-3 h-3 ${isSyncing ? 'animate-spin' : ''}`} />
+                      <span>{isSyncing ? 'Syncing...' : 'Sync Live'}</span>
                     </button>
-                  ))}
+                  </div>
+                  {filteredUsers.length === 0 ? (
+                    <div className="p-4 rounded-xl bg-[#001020] border border-dashed border-[#002447] text-center text-xs text-slate-400">
+                      No customer accounts found matching "{searchAccountInput}".
+                    </div>
+                  ) : (
+                    filteredUsers.map(u => (
+                      <button
+                        key={u.uid}
+                        type="button"
+                        onClick={() => {
+                          setSelectedUser(u);
+                          setSearchAccountInput(u.accountNumber);
+                        }}
+                        className={`w-full p-3 rounded-xl border text-left transition-all ${
+                          selectedUser?.uid === u.uid
+                            ? 'bg-[#00264d] border-cyan-400 shadow-md shadow-cyan-500/10'
+                            : 'bg-[#001326] border-[#002447] hover:border-slate-500'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-xs text-white">{u.fullName} {u.surname}</span>
+                          <span className="font-mono text-xs font-black text-cyan-300">{u.accountNumber}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-1">
+                          <span>{u.country} • {u.tier}</span>
+                          <span className="font-mono font-bold text-emerald-400">
+                            ${u.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             </div>
@@ -696,7 +739,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           type="text"
                           value={depositSenderName}
                           onChange={(e) => setDepositSenderName(e.target.value)}
-                          placeholder="e.g. Barclays London Clearing or J.P. Morgan Chase"
+                          placeholder="e.g. Aegis London Clearing or J.P. Morgan Chase"
                           className="w-full bg-[#001020] border border-[#003866] rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
                           required
                         />
@@ -1205,7 +1248,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         <span className="text-slate-500 text-[10px] shrink-0">Quick Presets:</span>
                         <button
                           type="button"
-                          onClick={() => setAdminReplyText('Hello! A Barclay senior clearing specialist has received your inquiry and is assisting you.')}
+                          onClick={() => setAdminReplyText('Hello! An Aegis senior treasury specialist has received your inquiry and is assisting you.')}
                           className="px-2 py-0.5 rounded bg-[#001c38] hover:bg-[#002b54] text-cyan-300 text-[10px] whitespace-nowrap border border-[#003366]"
                         >
                           "Specialist assisting"
@@ -1219,7 +1262,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => setAdminReplyText('Thank you for contacting Barclay Online Bank. Please let us know if you need additional assistance.')}
+                          onClick={() => setAdminReplyText('Thank you for contacting Aegis Online Bank. Please let us know if you need additional assistance.')}
                           className="px-2 py-0.5 rounded bg-[#001c38] hover:bg-[#002b54] text-slate-300 text-[10px] whitespace-nowrap border border-[#003366]"
                         >
                           "Thank you"

@@ -37,7 +37,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     {
       id: '1',
       sender: 'bot',
-      text: `Hello ${userName}, welcome to Barclay Online Bank Priority Private Support. How can our London desk assist your accounts or international wire settlements today?`,
+      text: `Hello ${userName}, welcome to Aegis Online Bank Priority Private Support. How can our London desk assist your accounts or international wire settlements today?`,
       time: 'Just now'
     }
   ]);
@@ -61,15 +61,15 @@ export const SupportModal: React.FC<SupportModalProps> = ({
     setInputText('');
 
     setTimeout(() => {
-      let reply = "Your inquiry has been logged with Barclay Client Services. For urgent SWIFT authorization or wire release, an administrative officer is reviewing pending requests.";
+      let reply = "Your inquiry has been logged with Aegis Client Services. For urgent SWIFT authorization or wire release, an administrative officer is reviewing pending requests.";
       if (query.includes('deposit') || query.includes('crypto') || query.includes('bitcoin') || query.includes('usdt')) {
-        reply = "For cryptocurrency deposits, please navigate to 'Deposit', copy the official Bitcoin or USDT ERC-20 address, and submit your transaction hash via 'I Have Made the Payment' for rapid admin approval.";
+        reply = "For cryptocurrency deposits, please navigate to 'Deposit', copy the official Bitcoin or USDT ERC-20 address, and submit your transaction hash via 'I Have Made the Payment' for rapid verification.";
       } else if (query.includes('swift') || query.includes('transfer') || query.includes('code')) {
-        reply = "International transfers require your 4-digit SWIFT authorization code. Once submitted, your transfer is marked as 'Pending' and will execute immediately upon administrator confirmation.";
+        reply = "International transfers require your 4-digit SWIFT authorization code. Once submitted, your transfer is processed securely.";
       } else if (query.includes('tier') || query.includes('upgrade') || query.includes('limit')) {
         reply = "Tier 2 provides a $50,000 daily limit ($5,000,000 monthly) via facial verification. Tier 3 unlocks VIP Elite limits with government ID verification. Submissions are reviewed directly by compliance officers.";
       } else if (query.includes('receipt')) {
-        reply = "You can view and print official Barclay Online Bank Transfer Advice receipts at any time by clicking any transaction in your Transaction History.";
+        reply = "You can view and print official Aegis Online Bank Transfer Advice receipts at any time by clicking any transaction in your Transaction History.";
       }
 
       const botReply: Message = {
@@ -92,7 +92,7 @@ export const SupportModal: React.FC<SupportModalProps> = ({
             <BrandLogo variant="horizontal" size="sm" />
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-sm font-extrabold text-white">Barclay Online Client Support</h3>
+                <h3 className="text-sm font-extrabold text-white">Aegis Online Client Support</h3>
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
               </div>
               <p className="text-[10px] text-slate-400">Canary Wharf Global Desk • 256-Bit Encrypted</p>

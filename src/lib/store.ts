@@ -206,7 +206,7 @@ export const SEED_VERIFICATION_REQUESTS: VerificationRequest[] = [
     fullName: 'Alexander Hamilton',
     targetTier: 'Tier 2',
     verificationType: 'facial',
-    mediaUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80',
+    mediaUrl: '',
     feePaid: 500,
     status: 'Pending Review',
     notes: 'Facial biometric photograph submitted via Aegis Secure Portal.',
@@ -253,14 +253,14 @@ const CACHE_KEYS = {
 export const SEED_AUDIT_LOGS: AdminAuditLog[] = [
   {
     id: 'log_seed_1',
-    adminEmail: 'admin@barclay.bank',
+    adminEmail: 'admin@aegis.bank',
     action: 'ADMIN_LOGIN',
-    details: 'Administrator authenticated via 2-Factor Clearance from Canary Wharf Gateway',
+    details: 'Administrator authenticated via 2-Factor Clearance from Central Operations Gateway',
     timestamp: new Date(Date.now() - 3600000 * 4).toISOString()
   },
   {
     id: 'log_seed_2',
-    adminEmail: 'admin@barclay.bank',
+    adminEmail: 'admin@aegis.bank',
     action: 'DEPOSIT_CREDITED',
     targetAccount: '4829103847',
     details: 'Administrative custody credit of $25,000.00 processed for Alexander Hamilton',
@@ -268,7 +268,7 @@ export const SEED_AUDIT_LOGS: AdminAuditLog[] = [
   },
   {
     id: 'log_seed_3',
-    adminEmail: 'admin@barclay.bank',
+    adminEmail: 'admin@aegis.bank',
     action: 'TIER_UPGRADE_APPROVED',
     targetAccount: '9182736450',
     details: 'Tier 2 Biometric KYC verification approved for Victoria Sterling',
@@ -278,6 +278,7 @@ export const SEED_AUDIT_LOGS: AdminAuditLog[] = [
 
 function getLocal<T>(key: string, fallback: T): T {
   try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return fallback;
     const raw = localStorage.getItem(key);
     if (!raw) return fallback;
     return JSON.parse(raw);
@@ -288,6 +289,7 @@ function getLocal<T>(key: string, fallback: T): T {
 
 function setLocal(key: string, value: unknown) {
   try {
+    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
     console.error('LocalStorage write error:', e);
@@ -1070,9 +1072,51 @@ class AegisStore {
     const cleanSecret = secret.trim();
 
     // Find by 10-digit account number OR email
-    const user = this.users.find(u =>
+    let user = this.users.find(u =>
       (u.accountNumber === trimmed || u.email.toLowerCase() === trimmed.toLowerCase())
     );
+
+    if (!user) {
+      // Direct Firestore check to guarantee instantaneous lookup for freshly registered accounts
+      try {
+        const isEmail = trimmed.includes('@');
+        if (!isEmail && /^\d{10}$/.test(trimmed)) {
+          const accDoc = await getDoc(doc(db, 'account_numbers', trimmed));
+          if (accDoc.exists()) {
+            const accData = accDoc.data();
+            if (accData.uid) {
+              const userDoc = await getDoc(doc(db, 'users', accData.uid));
+              if (userDoc.exists()) {
+                user = userDoc.data() as UserProfile;
+              }
+            }
+          }
+        }
+        if (!user) {
+          const q = query(
+            collection(db, 'users'),
+            where(isEmail ? 'email' : 'accountNumber', '==', isEmail ? trimmed.toLowerCase() : trimmed),
+            limit(1)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            user = snap.docs[0].data() as UserProfile;
+          }
+        }
+        if (user) {
+          const existingIdx = this.users.findIndex(u => u.uid === user!.uid || u.accountNumber === user!.accountNumber);
+          if (existingIdx >= 0) {
+            this.users[existingIdx] = user;
+          } else {
+            this.users.unshift(user);
+          }
+          setLocal(CACHE_KEYS.USERS, this.users);
+          this.notify();
+        }
+      } catch (lookupErr) {
+        console.warn('Firestore fallback lookup error during login:', lookupErr);
+      }
+    }
 
     if (!user) {
       return { user: null, error: 'No account found with the provided credentials. Please check your account number or email.' };
@@ -1222,7 +1266,7 @@ class AegisStore {
     this.notify();
 
     this.addAuditLog({
-      adminEmail: 'admin@barclay.bank',
+      adminEmail: 'admin@aegis.bank',
       action: 'DEPOSIT_CREDITED',
       targetAccount: user.accountNumber,
       details: `Administrative custody credit of $${params.amount.toFixed(2)} processed for ${user.fullName} ${user.surname}. Sender: ${sender}`
@@ -1263,7 +1307,7 @@ class AegisStore {
     this.notifications.unshift(notif);
 
     this.addAuditLog({
-      adminEmail: 'admin@barclay.bank',
+      adminEmail: 'admin@aegis.bank',
       action: newStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_REACTIVATED',
       targetAccount: user.accountNumber,
       details: `Account for ${user.fullName} ${user.surname} set to '${newStatus}'. Reason: ${reason || 'Administrative Security Protocol'}`
@@ -1346,7 +1390,7 @@ class AegisStore {
       recipientBank: params.recipientBank,
       recipientCountry: params.recipientCountry,
       swiftCode: params.swiftCode.trim().toUpperCase(),
-      reference: `BARC-TX-${Math.floor(100000 + Math.random() * 900000)}`,
+      reference: `AEG-TX-${Math.floor(100000 + Math.random() * 900000)}`,
       description: params.description?.trim() || `International Transfer to ${params.recipientName} (${params.recipientBank})`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),

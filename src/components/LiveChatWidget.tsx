@@ -1,20 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  MessageSquare, 
-  X, 
-  Send, 
-  Headphones, 
-  Mail, 
-  Check, 
-  CheckCheck, 
-  Clock, 
-  ShieldCheck,
-  Minimize2,
-  Maximize2
+import {
+  MessageSquare,
+  X,
+  Send,
+  Headphones,
+  Mail
 } from 'lucide-react';
 import { store } from '../lib/store';
-import { UserProfile, ChatMessage, SupportConversation } from '../types';
-import { BrandLogo } from './BrandLogo';
+import { UserProfile, SupportConversation } from '../types';
 
 interface LiveChatWidgetProps {
   currentUser: UserProfile | null;
@@ -42,14 +35,12 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
   const messages = currentConv?.messages || [];
   const unreadCount = currentConv?.unreadByUserCount || 0;
 
-  // Mark messages as read when window is open
   useEffect(() => {
     if (isOpen && currentUser) {
       store.markConversationReadByUser(currentUser.uid);
     }
   }, [isOpen, currentUser, messages.length]);
 
-  // Scroll to bottom
   useEffect(() => {
     if (isOpen) {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -77,83 +68,72 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
 
   return (
     <div className="fixed bottom-5 right-5 z-40 font-sans">
-      {/* Floating Toggle Button */}
+      {/* Floating Blue Circular Chat Bubble matching video bottom-right */}
       {!isOpen && (
         <button
+          type="button"
           onClick={() => setIsOpen(true)}
-          className="group relative flex items-center gap-2.5 px-4 py-3 rounded-full bg-gradient-to-r from-blue-600 via-blue-500 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold text-xs shadow-2xl shadow-blue-500/30 transition-all hover:scale-105 cursor-pointer border border-cyan-400/30"
-          title="Open Barclay 24/7 Live Support Chat"
+          aria-label="Open Aegis Live Support Chat"
+          className="relative w-14 h-14 rounded-full bg-[#1a73e8] hover:bg-[#2563eb] text-white shadow-xl shadow-blue-600/40 flex items-center justify-center transition-transform hover:scale-105 cursor-pointer"
         >
-          <div className="relative">
-            <MessageSquare className="w-4 h-4" />
-            <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-          </div>
-          <span>Live Support</span>
+          <MessageSquare className="w-6 h-6 fill-white text-white" />
           {unreadCount > 0 && (
-            <span className="ml-1 px-1.5 py-0.5 rounded-full bg-amber-400 text-slate-950 font-black text-[10px] animate-bounce">
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-purple-600 text-white font-bold text-[10px] flex items-center justify-center border-2 border-[#0b0d13]">
               {unreadCount}
             </span>
           )}
         </button>
       )}
 
-      {/* Chat Window */}
+      {/* Expanded Dark Chat Window */}
       {isOpen && (
-        <div className="w-[92vw] sm:w-96 h-[500px] bg-[#001428] border border-blue-500/40 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-white animate-in slide-in-from-bottom-5 duration-200">
-          
+        <div className="w-[92vw] sm:w-96 h-[480px] bg-[#131620] border border-white/15 rounded-2xl shadow-2xl flex flex-col overflow-hidden text-white">
           {/* Top Bar */}
-          <div className="p-4 bg-[#001020] border-b border-[#002b52] flex items-center justify-between shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-cyan-300">
-                  <Headphones className="w-4 h-4" />
-                </div>
-                <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#001020]" />
+          <div className="p-4 bg-[#0d0f17] border-b border-white/[0.08] flex items-center justify-between shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-r from-[#2176ff] to-[#7c3aed] flex items-center justify-center text-white">
+                <Headphones className="w-4 h-4" />
               </div>
               <div>
-                <h4 className="text-xs font-black text-white flex items-center gap-1.5">
-                  <span>Barclay Live Desk</span>
-                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-950 text-emerald-400 border border-emerald-800">
-                    Online
-                  </span>
-                </h4>
-                <p className="text-[10px] text-slate-400">Institutional Customer Concierge</p>
+                <h4 className="text-xs font-bold text-white">Aegis Live Desk</h4>
+                <p className="text-[11px] text-slate-400">24/7 Client Support Concierge</p>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={() => setIsOpen(false)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#002244] transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Direct Fast-Response Email Banner (Requirement 5) */}
-          <div className="px-4 py-2 bg-gradient-to-r from-blue-950/60 to-[#00172e] border-b border-[#00284d] text-[10px] flex items-center justify-between text-slate-300 shrink-0">
-            <div className="flex items-center gap-1.5 text-cyan-300 font-semibold truncate">
-              <Mail className="w-3.5 h-3.5 shrink-0" />
-              <span>Fast-Response Direct Email:</span>
-            </div>
-            <a 
-              href="mailto:newzelebarclaysupport@gmail.com" 
-              className="text-emerald-400 font-mono font-bold hover:underline ml-1"
+          {/* Direct Support Email Banner */}
+          <div className="px-4 py-2 bg-[#161a26] border-b border-white/[0.06] text-[10px] flex items-center justify-between text-slate-300 shrink-0">
+            <span className="flex items-center gap-1.5 text-slate-400">
+              <Mail className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+              <span>Direct Desk:</span>
+            </span>
+            <a
+              href="mailto:newzelebarclaysupport@gmail.com"
+              className="text-blue-400 font-mono font-semibold hover:underline truncate ml-2"
             >
               newzelebarclaysupport@gmail.com
             </a>
           </div>
 
           {/* Messages Thread */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-[#001224]/50">
+          <div className="flex-1 p-4 overflow-y-auto space-y-3 text-xs bg-[#0b0d13]/60">
             {messages.length === 0 ? (
               <div className="text-center py-10 space-y-3">
-                <div className="w-12 h-12 mx-auto rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-cyan-400">
-                  <MessageSquare className="w-6 h-6" />
+                <div className="w-12 h-12 mx-auto rounded-full bg-blue-600/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
+                  <MessageSquare className="w-5 h-5" />
                 </div>
                 <div>
                   <p className="font-bold text-white text-xs">How can we assist you today?</p>
                   <p className="text-[11px] text-slate-400 mt-1 max-w-[240px] mx-auto">
-                    Type a message below to chat live with a Barclay Clearing & Support Specialist.
+                    Send a message below to connect directly with an Aegis Online Bank specialist.
                   </p>
                 </div>
               </div>
@@ -161,20 +141,20 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
               messages.map((m) => {
                 const isMe = m.senderRole === 'user';
                 return (
-                  <div 
+                  <div
                     key={m.id}
                     className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                   >
-                    <div className="flex items-center gap-1 text-[9px] text-slate-400 mb-0.5 px-1">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-500 mb-0.5 px-1">
                       <span>{m.senderName}</span>
-                      <span>•</span>
+                      <span>·</span>
                       <span>{new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
-                    <div 
+                    <div
                       className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed ${
-                        isMe 
-                          ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-br-none shadow-md shadow-blue-600/20'
-                          : 'bg-[#002244] border border-[#003866] text-slate-100 rounded-bl-none shadow'
+                        isMe
+                          ? 'bg-gradient-to-r from-[#2176ff] to-[#6366f1] text-white rounded-br-none'
+                          : 'bg-[#191d2b] border border-white/10 text-slate-100 rounded-bl-none'
                       }`}
                     >
                       {m.message}
@@ -187,20 +167,20 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
           </div>
 
           {/* Input Box */}
-          <div className="p-3 bg-[#001020] border-t border-[#002b52] shrink-0">
+          <div className="p-3 bg-[#0d0f17] border-t border-white/[0.08] shrink-0">
             {currentUser ? (
               <form onSubmit={handleSend} className="flex items-center gap-2">
                 <input
                   type="text"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
-                  placeholder="Type your inquiry or wire question..."
-                  className="flex-1 bg-[#001d38] border border-[#00335c] rounded-xl px-3.5 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
+                  placeholder="Type your message..."
+                  className="flex-1 bg-[#161a26] border border-white/10 rounded-full px-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
                 />
                 <button
                   type="submit"
                   disabled={!inputText.trim()}
-                  className="p-2.5 rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-400 hover:to-cyan-400 text-slate-950 font-bold transition-all disabled:opacity-40 cursor-pointer shrink-0"
+                  className="w-9 h-9 rounded-full bg-gradient-to-r from-[#2176ff] to-[#7c3aed] text-white flex items-center justify-center transition-opacity disabled:opacity-40 cursor-pointer shrink-0"
                 >
                   <Send className="w-4 h-4" />
                 </button>
@@ -210,14 +190,13 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({
                 <button
                   type="button"
                   onClick={onOpenAuth}
-                  className="text-xs font-bold text-cyan-400 hover:underline"
+                  className="text-xs font-bold text-blue-400 hover:underline cursor-pointer"
                 >
-                  Sign In to message live support
+                  Sign In to chat with client support
                 </button>
               </div>
             )}
           </div>
-
         </div>
       )}
     </div>

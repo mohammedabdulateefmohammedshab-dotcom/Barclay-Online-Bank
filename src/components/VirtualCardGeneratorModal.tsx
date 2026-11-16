@@ -67,7 +67,7 @@ export const VirtualCardGeneratorModal: React.FC<VirtualCardGeneratorModalProps>
   const remaining = Math.max(0, totalDuration - elapsed);
 
   // Status message based on elapsed time
-  let currentStep = 'Initialising Barclay Card Network...';
+  let currentStep = 'Initialising Aegis Card Network...';
   let stepNumber = 1;
   if (elapsed >= 24) {
     currentStep = 'Embossing cardholder credentials & minting Platinum Virtual Debit Card...';
@@ -79,7 +79,7 @@ export const VirtualCardGeneratorModal: React.FC<VirtualCardGeneratorModalProps>
     currentStep = 'Provisioning 256-bit EMV cryptographic security keys & CVV...';
     stepNumber = 2;
   } else {
-    currentStep = 'Allocating Barclay Global Clearing BIN (4552 1089)...';
+    currentStep = 'Allocating Aegis Global Clearing BIN (4552 1089)...';
     stepNumber = 1;
   }
 
@@ -92,7 +92,7 @@ export const VirtualCardGeneratorModal: React.FC<VirtualCardGeneratorModalProps>
           <div className="flex items-center gap-2">
             <BrandLogo variant="emblem" size="sm" />
             <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-400">
-              Barclay Card Services
+              Aegis Card Services
             </span>
           </div>
           {elapsed >= totalDuration && (
@@ -107,7 +107,7 @@ export const VirtualCardGeneratorModal: React.FC<VirtualCardGeneratorModalProps>
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/10 to-transparent -translate-x-full animate-[shimmer_2s_infinite]" />
           
           <div className="flex justify-between items-center z-10">
-            <span className="text-[9px] font-mono font-bold text-cyan-300 uppercase tracking-widest">Barclay Platinum</span>
+            <span className="text-[9px] font-mono font-bold text-cyan-300 uppercase tracking-widest">Aegis Platinum</span>
             <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
           </div>
 
@@ -130,7 +130,7 @@ export const VirtualCardGeneratorModal: React.FC<VirtualCardGeneratorModalProps>
             Processing & Generating Virtual Card...
           </h3>
           <p className="text-xs text-slate-400 mt-1">
-            Allocating secure credentials on the Barclay Global Clearing Gateway.
+            Allocating secure credentials on the Aegis Global Clearing Gateway.
           </p>
         </div>
 
@@ -161,7 +161,7 @@ export const VirtualCardGeneratorModal: React.FC<VirtualCardGeneratorModalProps>
         </div>
 
         <p className="text-[10px] text-slate-500">
-          Barclay 256-bit Hardware Security Module (HSM) • EMV Level 3 Certified
+          Aegis 256-bit Hardware Security Module (HSM) • EMV Level 3 Certified
         </p>
 
       </div>

@@ -38,6 +38,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onSuccess
 }) => {
   const [mode, setMode] = useState<'login' | 'register' | 'forgot'>(initialMode);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setMode(initialMode);
+      setErrorMessage('');
+      setInfoMessage('');
+    }
+  }, [isOpen, initialMode]);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -191,8 +199,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   // Requirement 1 & 3: Display welcome message with name & 10-digit account number, then redirect to login page (DO NOT auto-login).
   if (registeredUser) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-        <div className="relative w-full max-w-lg bg-[#0A192F] border border-blue-500/40 rounded-3xl shadow-2xl p-6 sm:p-8 text-white text-center">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="relative w-full max-w-lg bg-[#131620] border border-white/10 rounded-3xl shadow-2xl p-6 sm:p-8 text-white text-center">
           
           {/* Redesigned Emblem Brand Logo */}
           <div className="flex justify-center mb-3">
@@ -208,7 +216,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </span>
 
           <h3 className="text-2xl font-black text-white mt-3">
-            Welcome to Barclay Online Bank!
+            Welcome to Aegis Online Bank!
           </h3>
 
           <p className="text-sm text-slate-300 mt-2">
@@ -265,7 +273,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               setLoginIdentifier(acc);
               setInfoMessage(`Account ${acc} registered! Please enter your PIN or Password to log in.`);
             }}
-            className="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white font-bold text-sm tracking-wide shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 transition-all"
+            className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#2176ff] via-[#4f46e5] to-[#7c3aed] hover:opacity-95 text-white font-bold text-sm tracking-wide shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
             <span>Proceed to Login Page</span>
             <ArrowRight className="w-4 h-4" />
@@ -276,31 +284,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-md bg-[#0A192F] border border-blue-500/30 rounded-3xl shadow-2xl overflow-hidden text-white">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+      <div className="relative w-full max-w-md bg-[#131620] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-white">
         
-        {/* Header with Redesigned Brand Logo */}
-        <div className="px-6 pt-5 pb-4 border-b border-[#1E293B] flex items-center justify-between">
+        {/* Header with Brand Logo */}
+        <div className="px-6 pt-5 pb-4 border-b border-white/[0.08] flex items-center justify-between bg-[#0d0f17]">
           <div className="flex items-center gap-3">
             <BrandLogo variant="horizontal" size="md" />
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-[#1E293B] transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Tab switch buttons */}
-        <div className="flex border-b border-[#1E293B] bg-[#071324]">
+        <div className="flex border-b border-white/[0.08] bg-[#0b0d13]">
           <button
             type="button"
             onClick={() => { setMode('login'); setErrorMessage(''); setInfoMessage(''); }}
-            className={`flex-1 py-3 text-xs font-bold text-center tracking-wide transition-all border-b-2 ${
+            className={`flex-1 py-3 text-xs font-bold text-center tracking-wide transition-all border-b-2 cursor-pointer ${
               mode === 'login'
-                ? 'text-blue-400 border-blue-500 bg-[#0F223D]'
+                ? 'text-blue-400 border-blue-500 bg-[#131620]'
                 : 'text-slate-400 border-transparent hover:text-slate-200'
             }`}
           >
@@ -309,9 +317,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="button"
             onClick={() => { setMode('register'); setErrorMessage(''); setInfoMessage(''); }}
-            className={`flex-1 py-3 text-xs font-bold text-center tracking-wide transition-all border-b-2 ${
+            className={`flex-1 py-3 text-xs font-bold text-center tracking-wide transition-all border-b-2 cursor-pointer ${
               mode === 'register'
-                ? 'text-blue-400 border-blue-500 bg-[#0F223D]'
+                ? 'text-blue-400 border-blue-500 bg-[#131620]'
                 : 'text-slate-400 border-transparent hover:text-slate-200'
             }`}
           >
@@ -320,9 +328,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <button
             type="button"
             onClick={() => { setMode('forgot'); setErrorMessage(''); setInfoMessage(''); }}
-            className={`py-3 px-3 text-xs font-semibold text-center tracking-wide transition-all border-b-2 ${
+            className={`py-3 px-3 text-xs font-semibold text-center tracking-wide transition-all border-b-2 cursor-pointer ${
               mode === 'forgot'
-                ? 'text-blue-400 border-blue-500 bg-[#0F223D]'
+                ? 'text-blue-400 border-blue-500 bg-[#131620]'
                 : 'text-slate-400 border-transparent hover:text-slate-200'
             }`}
           >
@@ -358,7 +366,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="e.g. 4829103847 or user@barclay.bank"
+                    placeholder="e.g. 4829103847 or user@aegisbank.com"
                     className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />
@@ -401,7 +409,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-2 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white font-bold text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                className="w-full mt-2 py-3 px-4 rounded-full bg-gradient-to-r from-[#2176ff] via-[#4f46e5] to-[#7c3aed] hover:opacity-95 text-white font-bold text-sm shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? 'Authenticating...' : 'Sign In to My Account'}
                 <ArrowRight className="w-4 h-4" />
@@ -549,7 +557,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <button
                 type="submit"
                 disabled={loading || !isPasswordValid || pin.length !== 4}
-                className="w-full mt-3 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white font-bold text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-40"
+                className="w-full mt-3 py-3 px-4 rounded-full bg-gradient-to-r from-[#2176ff] via-[#4f46e5] to-[#7c3aed] hover:opacity-95 text-white font-bold text-sm shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-40 cursor-pointer"
               >
                 {loading ? 'Registering & Generating Number...' : 'Complete Registration'}
                 <ArrowRight className="w-4 h-4" />
@@ -561,7 +569,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             /* Forgot Password Recovery */
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="text-xs text-slate-300">
-                <p>Enter the email address or 10-digit account number associated with your Barclay Online Bank account. We will securely verify your account and issue temporary recovery credentials.</p>
+                <p>Enter the email address or 10-digit account number associated with your Aegis Online Bank account. We will securely verify your account and issue temporary recovery credentials.</p>
               </div>
 
               <div>
@@ -574,7 +582,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="text"
                     value={recoveryIdentifier}
                     onChange={(e) => setRecoveryIdentifier(e.target.value)}
-                    placeholder="e.g. 4829103847 or alexander@barclay.bank"
+                    placeholder="e.g. 4829103847 or alexander@aegisbank.com"
                     className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />

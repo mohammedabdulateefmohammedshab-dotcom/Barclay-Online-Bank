@@ -21,7 +21,7 @@ export const LANGUAGES: LanguageOption[] = [
 
 export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
   en: {
-    brand: 'Barclay Online Bank',
+    brand: 'Aegis Online Bank',
     tagline: 'Premier International Digital Banking & Institutional Security',
     login: 'Login',
     createAccount: 'Create Account',
@@ -48,7 +48,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     madePayment: 'I Have Made the Payment'
   },
   fr: {
-    brand: 'Barclay Online Bank',
+    brand: 'Aegis Online Bank',
     tagline: 'Banque Numérique Internationale de Premier Ordre',
     login: 'Connexion',
     createAccount: 'Ouvrir un compte',
@@ -75,7 +75,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     madePayment: "J'ai effectué le paiement"
   },
   es: {
-    brand: 'Barclay Online Bank',
+    brand: 'Aegis Online Bank',
     tagline: 'Banca Digital Internacional de Primer Nivel',
     login: 'Iniciar Sesión',
     createAccount: 'Crear Cuenta',
@@ -102,7 +102,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     madePayment: 'He Realizado el Pago'
   },
   de: {
-    brand: 'Barclay Online Bank',
+    brand: 'Aegis Online Bank',
     tagline: 'Erstklassiges internationales Online-Banking & Sicherheit',
     login: 'Anmelden',
     createAccount: 'Konto Eröffnen',
@@ -129,7 +129,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     madePayment: 'Ich habe die Zahlung geleistet'
   },
   ar: {
-    brand: 'بنك باركلي الإلكتروني',
+    brand: 'بنك إيجيس الإلكتروني',
     tagline: 'الخدمات المصرفية الرقمية الدولية الرائدة والأمان المؤسسي',
     login: 'تسجيل الدخول',
     createAccount: 'فتح حساب',
@@ -156,7 +156,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     madePayment: 'لقد قمت بالدفع'
   },
   zh: {
-    brand: '巴克莱在线银行',
+    brand: 'Aegis在线银行',
     tagline: '卓越国际数字银行与机构级资产安全',
     login: '登录',
     createAccount: '开立账户',
@@ -183,7 +183,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     madePayment: '我已完成付款'
   },
   ru: {
-    brand: 'Barclay Online Bank',
+    brand: 'Aegis Online Bank',
     tagline: 'Премиальный международный цифровой банкинг',
     login: 'Вход',
     createAccount: 'Открыть счет',
@@ -210,7 +210,7 @@ export const TRANSLATIONS: Record<SupportedLanguage, Record<string, string>> = {
     madePayment: 'Я совершил платеж'
   },
   pt: {
-    brand: 'Barclay Online Bank',
+    brand: 'Aegis Online Bank',
     tagline: 'Banco Digital Internacional de Primeira Linha',
     login: 'Entrar',
     createAccount: 'Criar Conta',
