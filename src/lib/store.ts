@@ -257,7 +257,19 @@ class AegisStore {
       const adminSnap = await getDoc(doc(db, 'admins', uid));
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AdminRoleRecord;
-        if (adminData.status === 'active') {
+        if (PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
+          resolvedAdminTier = 'tier1';
+          adminRecord = {
+            ...adminData,
+            uid: adminData.uid || uid,
+            email: emailLower,
+            tier: 'tier1',
+            status: 'active',
+          };
+          if (adminData.tier !== 'tier1' || adminData.status !== 'active') {
+            await setDoc(doc(db, 'admins', uid), { ...adminRecord, updatedAt: now }, { merge: true });
+          }
+        } else if (adminData.status === 'active') {
           resolvedAdminTier = adminData.tier === 'tier1' ? 'tier1' : 'tier2';
           adminRecord = { ...adminData, uid: adminData.uid || uid };
         }
@@ -1088,7 +1100,10 @@ class AegisStore {
       return { user: profile, adminRecord };
     } catch (err: any) {
       let msg = 'Invalid credentials. Please verify your identifier and password.';
-      if (err?.code === 'auth/too-many-requests') {
+      if (err?.code === 'auth/operation-not-allowed') {
+        msg =
+          'Email/Password sign-in is disabled in Firebase Console for this project. Enable Authentication > Sign-in method > Email/Password in Firebase Console.';
+      } else if (err?.code === 'auth/too-many-requests') {
         msg = 'Too many failed login attempts. Please wait a moment or reset your password.';
       } else if (
         err?.code === 'auth/invalid-credential' ||
@@ -1186,11 +1201,17 @@ class AegisStore {
       this.notify();
       return { adminRecord: superAdminRecord };
     } catch (err: any) {
+      if (err?.code === 'auth/operation-not-allowed') {
+        return {
+          error:
+            'Email/Password authentication is disabled in Firebase Console for this project. Enable Authentication > Sign-in method > Email/Password in Firebase Console first.',
+        };
+      }
       if (err?.code === 'auth/email-already-in-use') {
         return {
           code: 'EMAIL_EXISTS',
           error:
-            'Credentials already exist for this administrator email. Sign in with your password, use Google Sign-In, or use Reset Admin Password.',
+            'Credentials already exist for this administrator email. Sign in with your password or use Reset Admin Password.',
         };
       }
       return { error: err?.message || 'Failed to initialize administrator credentials.' };
