@@ -1,114 +1,313 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
+    // ==================== HELPER PRIMITIVES ====================
     function isSignedIn() {
       return request.auth != null;
     }
-    
+
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-    
-    function isAdmin() {
+
+    function existing() {
+      return resource.data;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_.-]+$');
+    }
+
+    function isPrimarySuperAdminEmail() {
       return isSignedIn() && (
         request.auth.token.email == 'newzelebarclaysupport@gmail.com' ||
-        request.auth.token.email == 'mohammedabdulateefmohammedshab@gmail.com' ||
-        request.auth.token.email == 'admin@aegis.bank' ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        request.auth.token.email == 'mohammedabdulateefmohammedshab@gmail.com'
       );
     }
 
-    // Default deny
+    function isAdmin() {
+      return isSignedIn() && (
+        isPrimarySuperAdminEmail() ||
+        (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.status == 'active' &&
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.tier in ['tier1', 'tier2']
+        )
+      );
+    }
+
+    function isTier1Admin() {
+      return isSignedIn() && (
+        isPrimarySuperAdminEmail() ||
+        (
+          exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.status == 'active' &&
+          get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.tier == 'tier1'
+        )
+      );
+    }
+
+    function isAuthorizedWithdrawalLock() {
+      return incoming().diff(existing()).affectedKeys().hasOnly(['balance', 'lastBalanceLockId', 'lastBalanceLockType', 'updatedAt'])
+        && incoming().balance is number
+        && incoming().balance >= 0
+        && incoming().balance < existing().balance
+        && incoming().lastBalanceLockId is string
+        && (
+          (
+            incoming().lastBalanceLockType == 'withdrawal' &&
+            existsAfter(/databases/$(database)/documents/withdrawals/$(incoming().lastBalanceLockId)) &&
+            getAfter(/databases/$(database)/documents/withdrawals/$(incoming().lastBalanceLockId)).data.userId == request.auth.uid &&
+            getAfter(/databases/$(database)/documents/withdrawals/$(incoming().lastBalanceLockId)).data.status == 'Pending' &&
+            (existing().balance - incoming().balance - getAfter(/databases/$(database)/documents/withdrawals/$(incoming().lastBalanceLockId)).data.amount) <= 0.01 &&
+            (existing().balance - incoming().balance - getAfter(/databases/$(database)/documents/withdrawals/$(incoming().lastBalanceLockId)).data.amount) >= -0.01
+          ) || (
+            incoming().lastBalanceLockType == 'investment' &&
+            existsAfter(/databases/$(database)/documents/investments/$(incoming().lastBalanceLockId)) &&
+            getAfter(/databases/$(database)/documents/investments/$(incoming().lastBalanceLockId)).data.userId == request.auth.uid &&
+            getAfter(/databases/$(database)/documents/investments/$(incoming().lastBalanceLockId)).data.status == 'Active' &&
+            (existing().balance - incoming().balance - getAfter(/databases/$(database)/documents/investments/$(incoming().lastBalanceLockId)).data.amount) <= 0.01 &&
+            (existing().balance - incoming().balance - getAfter(/databases/$(database)/documents/investments/$(incoming().lastBalanceLockId)).data.amount) >= -0.01
+          )
+        );
+    }
+
+    // Default deny-all fallback
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // Admins collection
+    // ==================== ADMIN ROLES (TWO-TIER RBAC) ====================
     match /admins/{adminId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow get: if isValidId(adminId) && (isOwner(adminId) || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isValidId(adminId) && (
+        isTier1Admin() ||
+        (
+          isOwner(adminId) &&
+          isPrimarySuperAdminEmail() &&
+          incoming().tier == 'tier1' &&
+          incoming().status == 'active'
+        )
+      );
+      allow update, delete: if isValidId(adminId) && isTier1Admin() && existing().tier != 'tier1';
     }
 
-    // Users collection
+    // ==================== PERMANENT USER PROFILES ====================
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if isOwner(userId) || isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isValidId(userId) && (
+        isAdmin() ||
+        (
+          isOwner(userId) &&
+          incoming().uid == request.auth.uid &&
+          incoming().balance == 0 &&
+          (
+            isPrimarySuperAdminEmail() ||
+            (incoming().role == 'user' && !incoming().keys().hasAny(['adminTier']))
+          )
+        )
+      );
+      allow update: if isValidId(userId) && (
+        isAdmin() ||
+        (
+          isOwner(userId) &&
+          (
+            (
+              incoming().diff(existing()).affectedKeys().hasOnly([
+                'username', 'fullName', 'surname', 'country', 'photoUrl', 'pin', 'currency', 'card', 'updatedAt'
+              ]) &&
+              incoming().balance == existing().balance &&
+              incoming().role == existing().role &&
+              incoming().status == existing().status &&
+              incoming().tier == existing().tier
+            ) ||
+            isAuthorizedWithdrawalLock()
+          )
+        )
+      );
+      allow delete: if isValidId(userId) && isTier1Admin();
     }
 
-    // 10-digit account numbers registry index for fast lookup
+    // ==================== NON-PII LOOKUP INDEXES ====================
     match /account_numbers/{accountNumber} {
-      allow read: if isSignedIn() || isAdmin();
-      allow create: if isSignedIn() || isAdmin();
-      allow update, delete: if isAdmin();
+      allow get: if isValidId(accountNumber);
+      allow list: if isAdmin();
+      allow create: if isValidId(accountNumber) && isSignedIn();
+      allow update, delete: if isValidId(accountNumber) && isAdmin();
     }
 
-    // Transactions collection
-    match /transactions/{txId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+    match /usernames/{username} {
+      allow get: if isValidId(username);
+      allow list: if isAdmin();
+      allow create: if isValidId(username) && isSignedIn() && incoming().uid == request.auth.uid;
+      allow update: if isValidId(username) && ((isSignedIn() && existing().uid == request.auth.uid) || isAdmin());
+      allow delete: if isValidId(username) && isAdmin();
     }
 
-    // Payment submissions
+    match /referral_codes/{code} {
+      allow get: if isValidId(code);
+      allow list: if isAdmin();
+      allow create: if isValidId(code) && isSignedIn() && incoming().uid == request.auth.uid;
+      allow update, delete: if isValidId(code) && isAdmin();
+    }
+
+    // ==================== DEPOSITS & PAYMENT SUBMISSIONS ====================
+    match /deposits/{depositId} {
+      allow get: if isValidId(depositId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(depositId) && (
+        isAdmin() ||
+        (
+          isSignedIn() &&
+          incoming().userId == request.auth.uid &&
+          incoming().status == 'Pending' &&
+          incoming().amount is number &&
+          incoming().amount > 0
+        )
+      );
+      allow update: if isValidId(depositId) && isAdmin();
+      allow delete: if isValidId(depositId) && isTier1Admin();
+    }
+
     match /payment_submissions/{subId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isValidId(subId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(subId) && isSignedIn() && incoming().userId == request.auth.uid && incoming().status == 'Pending' && incoming().amount is number && incoming().amount > 0;
+      allow update: if isValidId(subId) && isAdmin();
+      allow delete: if isValidId(subId) && isTier1Admin();
     }
 
-    // Verification requests (Tier 2/Tier 3)
+    // ==================== WITHDRAWALS ====================
+    match /withdrawals/{withdrawalId} {
+      allow get: if isValidId(withdrawalId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(withdrawalId) && isSignedIn()
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'Pending'
+        && incoming().balanceReserved == true
+        && incoming().amount is number
+        && incoming().amount > 0;
+      allow update: if isValidId(withdrawalId) && isAdmin();
+      allow delete: if false; // Never delete withdrawal history
+    }
+
+    // ==================== TRANSACTIONS LEDGER ====================
+    match /transactions/{txId} {
+      allow get: if isValidId(txId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(txId) && (
+        isAdmin() ||
+        (
+          isSignedIn() &&
+          incoming().userId == request.auth.uid &&
+          incoming().amount is number &&
+          incoming().amount > 0 &&
+          (
+            incoming().status == 'Pending' ||
+            (incoming().type == 'investment' && incoming().status == 'Completed')
+          )
+        )
+      );
+      allow update: if isValidId(txId) && isAdmin();
+      allow delete: if false;
+    }
+
+    // ==================== INVESTMENTS & PLANS ====================
+    match /investment_plans/{planId} {
+      allow read: if true;
+      allow create, update, delete: if isValidId(planId) && isTier1Admin();
+    }
+
+    match /investments/{investmentId} {
+      allow get: if isValidId(investmentId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(investmentId) && isSignedIn()
+        && incoming().userId == request.auth.uid
+        && incoming().status == 'Active'
+        && incoming().amount is number
+        && incoming().amount > 0;
+      allow update: if isValidId(investmentId) && isAdmin();
+      allow delete: if false;
+    }
+
+    // ==================== REFERRALS ====================
+    match /referrals/{referralId} {
+      allow get: if isValidId(referralId) && (isAdmin() || (isSignedIn() && (existing().referrerUid == request.auth.uid || existing().referredUid == request.auth.uid)));
+      allow list: if isAdmin() || (isSignedIn() && (resource.data.referrerUid == request.auth.uid || resource.data.referredUid == request.auth.uid));
+      allow create: if isValidId(referralId) && isSignedIn() && incoming().referredUid == request.auth.uid && incoming().status == 'Pending';
+      allow update: if isValidId(referralId) && isAdmin();
+      allow delete: if false;
+    }
+
+    // ==================== BANKING & PAYMENT INFORMATION ====================
+    match /banking_info/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());
+      allow list: if isAdmin();
+      allow create, update: if isValidId(userId) && (isOwner(userId) || isAdmin()) && incoming().uid == userId;
+      allow delete: if isValidId(userId) && (isOwner(userId) || isTier1Admin());
+    }
+
+    // ==================== KYC & SWIFT VERIFICATIONS ====================
     match /verification_requests/{reqId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isValidId(reqId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(reqId) && isSignedIn() && incoming().userId == request.auth.uid && incoming().status == 'Pending Review';
+      allow update: if isValidId(reqId) && isAdmin();
+      allow delete: if isValidId(reqId) && isTier1Admin();
     }
 
-    // Notifications
-    match /notifications/{notifId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow delete: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-    }
-
-    // Central bank audit logs
-    match /audit_logs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isSignedIn() || isAdmin();
-      allow update, delete: if isAdmin();
-    }
-
-    // SWIFT requests
     match /swift_requests/{reqId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isValidId(reqId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(reqId) && isSignedIn() && incoming().userId == request.auth.uid && incoming().status == 'Pending';
+      allow update: if isValidId(reqId) && isAdmin();
+      allow delete: if isValidId(reqId) && isTier1Admin();
     }
 
-    // Customer support live chat conversations
+    // ==================== NOTIFICATIONS ====================
+    match /notifications/{notifId} {
+      allow get: if isValidId(notifId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isValidId(notifId) && isSignedIn();
+      allow update: if isValidId(notifId) && (
+        isAdmin() ||
+        (isSignedIn() && existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['read']))
+      );
+      allow delete: if isValidId(notifId) && (isAdmin() || (isSignedIn() && existing().userId == request.auth.uid));
+    }
+
+    // ==================== IMMUTABLE AUDIT LOGS ====================
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && isAdmin();
+      allow list: if isAdmin();
+      allow create: if isValidId(logId) && isSignedIn();
+      allow update, delete: if false; // Strictly immutable audit ledger
+    }
+
+    // ==================== LIVE SUPPORT CHATS ====================
     match /chat_conversations/{convId} {
-      allow read: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow create: if isSignedIn();
-      allow update: if (isSignedIn() && resource.data.userId == request.auth.uid) || isAdmin();
-      allow delete: if isAdmin();
+      allow get: if isValidId(convId) && (isAdmin() || isOwner(convId) || (isSignedIn() && existing().userId == request.auth.uid));
+      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create, update: if isValidId(convId) && (isAdmin() || isOwner(convId) || (isSignedIn() && incoming().userId == request.auth.uid));
+      allow delete: if isValidId(convId) && isAdmin();
     }
 
-    // Settings (financial settings, wallet addresses, upgrade fees, limits)
+    // ==================== GLOBAL FINANCIAL SETTINGS (TIER 1 ONLY) ====================
     match /settings/{settingId} {
-      allow read: if true; // Public financial configuration for customers
-      allow write: if isAdmin();
+      allow read: if true;
+      allow write: if isValidId(settingId) && isTier1Admin();
     }
-    
-    // Test collection for connection probe
+
+    // ==================== CONNECTION PROBE ====================
     match /test/{docId} {
-      allow read, write: if true;
+      allow get: if isValidId(docId);
     }
   }
 }

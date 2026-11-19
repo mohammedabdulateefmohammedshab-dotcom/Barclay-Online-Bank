@@ -2,21 +2,28 @@
   "entities": {
     "User": {
       "title": "User",
-      "description": "Registered Aegis Online Bank customer profile",
+      "description": "Registered Aegis Online Bank customer profile stored permanently in Firestore",
       "type": "object",
       "properties": {
         "uid": { "type": "string", "maxLength": 128 },
         "accountNumber": { "type": "string", "maxLength": 10, "minLength": 10, "pattern": "^[0-9]{10}$" },
+        "username": { "type": "string", "maxLength": 80 },
         "fullName": { "type": "string", "maxLength": 100 },
         "surname": { "type": "string", "maxLength": 100 },
         "email": { "type": "string", "maxLength": 150 },
         "country": { "type": "string", "maxLength": 100 },
         "pin": { "type": "string", "maxLength": 4, "minLength": 4 },
+        "photoUrl": { "type": "string", "maxLength": 500000 },
         "balance": { "type": "number" },
         "currency": { "type": "string", "maxLength": 10 },
         "tier": { "type": "string", "enum": ["Tier 1", "Tier 2", "Tier 3"] },
         "status": { "type": "string", "enum": ["active", "suspended", "pending"] },
         "role": { "type": "string", "enum": ["user", "admin"] },
+        "adminTier": { "type": "string", "enum": ["tier1", "tier2"] },
+        "referralCode": { "type": "string", "maxLength": 30 },
+        "referredBy": { "type": "string", "maxLength": 30 },
+        "lastBalanceLockId": { "type": "string", "maxLength": 128 },
+        "lastBalanceLockType": { "type": "string", "enum": ["withdrawal", "investment"] },
         "createdAt": { "type": "string", "maxLength": 50 },
         "updatedAt": { "type": "string", "maxLength": 50 }
       },
@@ -24,32 +31,74 @@
     },
     "AccountNumberIndex": {
       "title": "AccountNumberIndex",
-      "description": "10-digit account number index for fast user lookup",
+      "description": "10-digit account number lookup index for sign-in resolution",
       "type": "object",
       "properties": {
         "accountNumber": { "type": "string", "maxLength": 10 },
         "uid": { "type": "string", "maxLength": 128 },
         "email": { "type": "string", "maxLength": 150 },
+        "username": { "type": "string", "maxLength": 80 },
         "fullName": { "type": "string", "maxLength": 200 },
         "createdAt": { "type": "string", "maxLength": 50 }
       },
       "required": ["accountNumber", "uid", "email"]
     },
+    "UsernameIndex": {
+      "title": "UsernameIndex",
+      "description": "Unique username lookup index for sign-in resolution",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 150 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "username": { "type": "string", "maxLength": 80 }
+      },
+      "required": ["uid", "email", "username"]
+    },
+    "ReferralCodeIndex": {
+      "title": "ReferralCodeIndex",
+      "description": "Referral code lookup index",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "email": { "type": "string", "maxLength": 150 },
+        "code": { "type": "string", "maxLength": 30 }
+      },
+      "required": ["uid", "accountNumber", "code"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Two-tier administrator authorization record",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 150 },
+        "username": { "type": "string", "maxLength": 80 },
+        "fullName": { "type": "string", "maxLength": 200 },
+        "tier": { "type": "string", "enum": ["tier1", "tier2"] },
+        "status": { "type": "string", "enum": ["active", "revoked"] },
+        "createdBy": { "type": "string", "maxLength": 150 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "email", "tier", "status", "createdBy", "createdAt"]
+    },
     "Transaction": {
       "title": "Transaction",
-      "description": "Financial transfer, deposit, or withdrawal record",
+      "description": "Immutable bank ledger transaction",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
         "userId": { "type": "string", "maxLength": 128 },
         "accountNumber": { "type": "string", "maxLength": 10 },
-        "type": { "type": "string", "enum": ["deposit", "withdrawal", "transfer", "crypto_payment", "tier_upgrade"] },
+        "type": { "type": "string", "enum": ["deposit", "withdrawal", "transfer", "crypto_payment", "tier_upgrade", "investment", "investment_payout", "referral_bonus"] },
         "amount": { "type": "number" },
         "currency": { "type": "string", "maxLength": 10 },
         "status": { "type": "string", "enum": ["Pending", "Completed", "Reversed", "Cancelled"] },
         "senderName": { "type": "string", "maxLength": 150 },
         "recipientName": { "type": "string", "maxLength": 150 },
-        "recipientAccountNumber": { "type": "string", "maxLength": 50 },
+        "recipientAccountNumber": { "type": "string", "maxLength": 80 },
         "recipientBank": { "type": "string", "maxLength": 150 },
         "recipientCountry": { "type": "string", "maxLength": 100 },
         "swiftCode": { "type": "string", "maxLength": 20 },
@@ -60,16 +109,17 @@
       },
       "required": ["id", "userId", "type", "amount", "status", "createdAt"]
     },
-    "PaymentSubmission": {
-      "title": "PaymentSubmission",
-      "description": "Cryptocurrency or wire proof submission for admin review",
+    "Deposit": {
+      "title": "Deposit",
+      "description": "Permanent deposit request record",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
         "userId": { "type": "string", "maxLength": 128 },
         "accountNumber": { "type": "string", "maxLength": 10 },
         "userFullName": { "type": "string", "maxLength": 200 },
-        "method": { "type": "string", "enum": ["BTC", "USDT_ERC20", "Bank_Wire"] },
+        "userEmail": { "type": "string", "maxLength": 150 },
+        "method": { "type": "string", "enum": ["BTC", "USDT_ERC20", "Bank_Wire", "Card_Token"] },
         "amount": { "type": "number" },
         "currency": { "type": "string", "maxLength": 10 },
         "txHashOrRef": { "type": "string", "maxLength": 200 },
@@ -82,9 +132,126 @@
       },
       "required": ["id", "userId", "accountNumber", "method", "amount", "status", "createdAt"]
     },
+    "Withdrawal": {
+      "title": "Withdrawal",
+      "description": "Withdrawal request with atomic balance reservation and refund protection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "userFullName": { "type": "string", "maxLength": 200 },
+        "userEmail": { "type": "string", "maxLength": 150 },
+        "method": { "type": "string", "enum": ["bank", "crypto"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "beneficiaryName": { "type": "string", "maxLength": 150 },
+        "destination": { "type": "string", "maxLength": 200 },
+        "bankName": { "type": "string", "maxLength": 150 },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Cancelled"] },
+        "balanceReserved": { "type": "boolean" },
+        "reservedAmount": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "accountNumber", "method", "amount", "status", "balanceReserved", "createdAt"]
+    },
+    "PaymentSubmission": {
+      "title": "PaymentSubmission",
+      "description": "Legacy & synced proof submission",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "userFullName": { "type": "string", "maxLength": 200 },
+        "method": { "type": "string", "enum": ["BTC", "USDT_ERC20", "Bank_Wire", "Card_Token"] },
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "maxLength": 10 },
+        "txHashOrRef": { "type": "string", "maxLength": 200 },
+        "walletAddress": { "type": "string", "maxLength": 200 },
+        "proofImageUrl": { "type": "string", "maxLength": 500000 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Cancelled"] },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "accountNumber", "method", "amount", "status", "createdAt"]
+    },
+    "InvestmentPlan": {
+      "title": "InvestmentPlan",
+      "description": "Tier 1 managed investment plan catalog",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 400 },
+        "minAmount": { "type": "number" },
+        "maxAmount": { "type": "number" },
+        "roiPercent": { "type": "number" },
+        "durationDays": { "type": "number" },
+        "riskLevel": { "type": "string", "enum": ["Conservative", "Balanced", "Growth"] },
+        "active": { "type": "boolean" },
+        "createdBy": { "type": "string", "maxLength": 150 },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "name", "minAmount", "maxAmount", "roiPercent", "durationDays", "active"]
+    },
+    "UserInvestment": {
+      "title": "UserInvestment",
+      "description": "Customer investment position",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "planId": { "type": "string", "maxLength": 128 },
+        "planName": { "type": "string", "maxLength": 120 },
+        "amount": { "type": "number" },
+        "expectedReturn": { "type": "number" },
+        "status": { "type": "string", "enum": ["Active", "Completed", "Cancelled"] },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "userId", "planId", "amount", "expectedReturn", "status", "createdAt"]
+    },
+    "ReferralRecord": {
+      "title": "ReferralRecord",
+      "description": "Referral attribution & bonus payout record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "referrerUid": { "type": "string", "maxLength": 128 },
+        "referredUid": { "type": "string", "maxLength": 128 },
+        "referralCode": { "type": "string", "maxLength": 30 },
+        "rewardAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Pending", "Credited", "Cancelled"] },
+        "createdAt": { "type": "string", "maxLength": 50 },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["id", "referrerUid", "referredUid", "referralCode", "status", "createdAt"]
+    },
+    "BankingPaymentInfo": {
+      "title": "BankingPaymentInfo",
+      "description": "Customer bank payout coordinates and tokenized card summaries (no CVV/raw PAN)",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "accountNumber": { "type": "string", "maxLength": 10 },
+        "bankAccountName": { "type": "string", "maxLength": 150 },
+        "bankAccountNumber": { "type": "string", "maxLength": 80 },
+        "bankName": { "type": "string", "maxLength": 150 },
+        "swiftBicCode": { "type": "string", "maxLength": 20 },
+        "bankCountry": { "type": "string", "maxLength": 100 },
+        "preferredMethod": { "type": "string", "enum": ["BTC", "USDT_ERC20", "Bank_Wire", "Card_Token"] },
+        "updatedAt": { "type": "string", "maxLength": 50 }
+      },
+      "required": ["uid", "accountNumber", "bankAccountName", "bankAccountNumber", "bankName"]
+    },
     "VerificationRequest": {
       "title": "VerificationRequest",
-      "description": "Tier 2 facial verification or Tier 3 government ID verification submission",
+      "description": "Tier 2/3 KYC biometric & ID verification",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
@@ -93,12 +260,8 @@
         "fullName": { "type": "string", "maxLength": 200 },
         "targetTier": { "type": "string", "enum": ["Tier 2", "Tier 3"] },
         "verificationType": { "type": "string", "enum": ["facial", "government_id"] },
-        "documentType": { "type": "string", "maxLength": 50 },
-        "documentNumber": { "type": "string", "maxLength": 100 },
         "mediaUrl": { "type": "string", "maxLength": 500000 },
-        "feePaid": { "type": "number" },
         "status": { "type": "string", "enum": ["Pending Review", "Approved", "Rejected"] },
-        "notes": { "type": "string", "maxLength": 500 },
         "createdAt": { "type": "string", "maxLength": 50 },
         "updatedAt": { "type": "string", "maxLength": 50 }
       },
@@ -106,7 +269,7 @@
     },
     "Notification": {
       "title": "Notification",
-      "description": "Real-time user alerts, transaction approvals, and admin notices",
+      "description": "Real-time user alerts and transaction notices",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
@@ -115,20 +278,27 @@
         "message": { "type": "string", "maxLength": 1000 },
         "type": { "type": "string", "enum": ["info", "success", "warning", "transaction", "verification", "security"] },
         "read": { "type": "boolean" },
-        "relatedId": { "type": "string", "maxLength": 128 },
         "createdAt": { "type": "string", "maxLength": 50 }
       },
       "required": ["id", "userId", "title", "message", "type", "read", "createdAt"]
     },
     "AdminAuditLog": {
       "title": "AdminAuditLog",
-      "description": "Immutable bank ledger audit logs for compliance",
+      "description": "Strictly immutable audit trail of all admin operations",
       "type": "object",
       "properties": {
         "id": { "type": "string", "maxLength": 128 },
+        "adminId": { "type": "string", "maxLength": 128 },
+        "adminUsername": { "type": "string", "maxLength": 80 },
         "adminEmail": { "type": "string", "maxLength": 150 },
+        "adminTier": { "type": "string", "maxLength": 20 },
         "action": { "type": "string", "maxLength": 100 },
         "targetAccount": { "type": "string", "maxLength": 50 },
+        "transactionId": { "type": "string", "maxLength": 128 },
+        "previousStatus": { "type": "string", "maxLength": 50 },
+        "newStatus": { "type": "string", "maxLength": 50 },
+        "amount": { "type": "number" },
+        "reason": { "type": "string", "maxLength": 500 },
         "details": { "type": "string", "maxLength": 1000 },
         "timestamp": { "type": "string", "maxLength": 50 }
       },
@@ -136,7 +306,7 @@
     },
     "FinancialSettings": {
       "title": "FinancialSettings",
-      "description": "Configurable global bank settings, limits, fees, and cryptocurrency addresses",
+      "description": "Global banking & wallet parameters managed by Tier 1 Super Admins",
       "type": "object",
       "properties": {
         "verificationFee": { "type": "number" },
@@ -150,6 +320,12 @@
         "tier3MonthlyLimit": { "type": "number" },
         "btcAddress": { "type": "string", "maxLength": 200 },
         "usdtAddress": { "type": "string", "maxLength": 200 },
+        "clearingBankName": { "type": "string", "maxLength": 150 },
+        "clearingBankAccountName": { "type": "string", "maxLength": 150 },
+        "clearingBankAccountNumber": { "type": "string", "maxLength": 80 },
+        "clearingSwiftCode": { "type": "string", "maxLength": 20 },
+        "clearingCountry": { "type": "string", "maxLength": 100 },
+        "referralBonusAmount": { "type": "number" },
         "requireSwiftCode": { "type": "boolean" },
         "updatedAt": { "type": "string", "maxLength": 50 }
       },
@@ -157,37 +333,22 @@
     }
   },
   "firestore": {
-    "/users/{userId}": {
-      "schema": "User",
-      "description": "Aegis customer bank profiles"
-    },
-    "/account_numbers/{accountNumber}": {
-      "schema": "AccountNumberIndex",
-      "description": "10-digit account number index for fast user lookup"
-    },
-    "/transactions/{transactionId}": {
-      "schema": "Transaction",
-      "description": "Bank transfers, deposits, withdrawals, and ledger items"
-    },
-    "/payment_submissions/{submissionId}": {
-      "schema": "PaymentSubmission",
-      "description": "Cryptocurrency and wire proof submissions"
-    },
-    "/verification_requests/{requestId}": {
-      "schema": "VerificationRequest",
-      "description": "Tier 2 and Tier 3 KYC and identity verification documents"
-    },
-    "/notifications/{notificationId}": {
-      "schema": "Notification",
-      "description": "User notification messages"
-    },
-    "/audit_logs/{logId}": {
-      "schema": "AdminAuditLog",
-      "description": "Central bank compliance audit trails"
-    },
-    "/settings/financial": {
-      "schema": "FinancialSettings",
-      "description": "Global bank parameters, fees, limits, and crypto wallets"
-    }
+    "/users/{userId}": { "schema": "User", "description": "Permanent customer profiles" },
+    "/account_numbers/{accountNumber}": { "schema": "AccountNumberIndex", "description": "10-digit account lookup index" },
+    "/usernames/{username}": { "schema": "UsernameIndex", "description": "Unique username lookup index" },
+    "/referral_codes/{code}": { "schema": "ReferralCodeIndex", "description": "Referral code lookup index" },
+    "/admins/{adminId}": { "schema": "AdminRole", "description": "Two-tier admin authorization registry" },
+    "/transactions/{transactionId}": { "schema": "Transaction", "description": "Ledger history" },
+    "/deposits/{depositId}": { "schema": "Deposit", "description": "Customer and admin deposit records" },
+    "/withdrawals/{withdrawalId}": { "schema": "Withdrawal", "description": "Customer withdrawals with balance reservation" },
+    "/payment_submissions/{submissionId}": { "schema": "PaymentSubmission", "description": "Payment proofs" },
+    "/investment_plans/{planId}": { "schema": "InvestmentPlan", "description": "Investment plan catalog" },
+    "/investments/{investmentId}": { "schema": "UserInvestment", "description": "Customer investment subscriptions" },
+    "/referrals/{referralId}": { "schema": "ReferralRecord", "description": "Referral bonus records" },
+    "/banking_info/{userId}": { "schema": "BankingPaymentInfo", "description": "Saved external banking & crypto payout details" },
+    "/verification_requests/{requestId}": { "schema": "VerificationRequest", "description": "KYC uploads" },
+    "/notifications/{notificationId}": { "schema": "Notification", "description": "User alerts" },
+    "/audit_logs/{logId}": { "schema": "AdminAuditLog", "description": "Immutable admin audit log" },
+    "/settings/financial": { "schema": "FinancialSettings", "description": "Tier 1 bank configuration" }
   }
 }

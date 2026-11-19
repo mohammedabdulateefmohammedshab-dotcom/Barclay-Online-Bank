@@ -1,23 +1,23 @@
 import React from 'react';
-import { 
-  X, 
-  User, 
-  Settings, 
-  Clock, 
-  Building2, 
-  Sparkles, 
-  Zap, 
-  ArrowDownLeft, 
-  ArrowDownRight, 
-  CreditCard, 
-  Headphones, 
-  Lock, 
-  LogOut, 
+import {
+  X,
+  User,
+  Settings,
+  Clock,
+  Building2,
+  Sparkles,
+  Zap,
+  ArrowDownLeft,
+  ArrowDownRight,
+  CreditCard,
+  Headphones,
+  Lock,
+  LogOut,
   ChevronRight,
-  ShieldCheck,
-  CheckCircle2,
   Copy,
-  Check
+  Check,
+  TrendingUp,
+  Gift
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { BrandLogo } from './BrandLogo';
@@ -35,6 +35,8 @@ interface CustomerNavDrawerProps {
   onOpenDeposit: () => void;
   onOpenWithdrawalHistory: () => void;
   onOpenPaymentMethods: () => void;
+  onOpenInvestments: () => void;
+  onOpenReferrals: () => void;
   onOpenSupportCenter: () => void;
   onOpenSecuritySettings: () => void;
   onLogout: () => void;
@@ -68,6 +70,8 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
   onOpenDeposit,
   onOpenWithdrawalHistory,
   onOpenPaymentMethods,
+  onOpenInvestments,
+  onOpenReferrals,
   onOpenSupportCenter,
   onOpenSecuritySettings,
   onLogout
@@ -88,8 +92,8 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
       items: [
         {
           id: 'profile',
-          label: 'Profile',
-          description: 'Personal details and verification status',
+          label: 'Profile & Picture',
+          description: 'Photo upload, username & personal identity',
           icon: User,
           color: 'text-blue-400',
           onClick: onOpenProfile
@@ -113,23 +117,39 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
       ]
     },
     {
-      title: 'Transfers & Liquidity',
+      title: 'Transfers, Banking & Growth',
       items: [
         {
           id: 'deposit',
           label: 'Deposit Funds',
-          description: 'Instant crypto & wire clearing',
+          description: 'Crypto & wire proof submissions',
           icon: ArrowDownLeft,
           color: 'text-emerald-400',
           onClick: onOpenDeposit
         },
         {
           id: 'payment_methods',
-          label: 'Payment Methods',
-          description: 'Platinum virtual card & crypto custody',
+          label: 'Banking & Payment Info',
+          description: 'Saved payout banks, wallets & tokenized cards',
           icon: CreditCard,
           color: 'text-cyan-300',
           onClick: onOpenPaymentMethods
+        },
+        {
+          id: 'investments',
+          label: 'Investment Plans & Portfolio',
+          description: 'Fixed-term yield vaults & positions',
+          icon: TrendingUp,
+          color: 'text-emerald-400',
+          onClick: onOpenInvestments
+        },
+        {
+          id: 'referrals',
+          label: 'Referrals & Rewards',
+          description: 'Invite link & referral bonus tracking',
+          icon: Gift,
+          color: 'text-amber-300',
+          onClick: onOpenReferrals
         },
         {
           id: 'tx_history',
@@ -142,7 +162,7 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
         {
           id: 'withdrawal_history',
           label: 'Withdrawal History',
-          description: 'Outbound wire settlements & tracking',
+          description: 'Outbound settlements & status tracking',
           icon: ArrowDownRight,
           color: 'text-amber-400',
           onClick: onOpenWithdrawalHistory
@@ -178,7 +198,7 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
         {
           id: 'security',
           label: 'Security Settings',
-          description: '4-digit PIN, passwords & authentication',
+          description: '4-digit PIN & Firebase Auth password',
           icon: Lock,
           color: 'text-emerald-400',
           onClick: onOpenSecuritySettings
@@ -197,16 +217,13 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden font-sans">
-      {/* Backdrop */}
-      <div 
+      <div
         onClick={onClose}
         className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
       />
 
-      {/* Drawer Container */}
       <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
         <div className="w-screen max-w-md bg-[#001020] border-l border-[#002b52] shadow-2xl flex flex-col text-white animate-in slide-in-from-right duration-300">
-          
           {/* Top Header */}
           <div className="p-5 bg-[#000d1a] border-b border-[#002447] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3">
@@ -225,9 +242,17 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
           <div className="p-5 bg-gradient-to-br from-[#00172e] to-[#001224] border-b border-[#002447] shrink-0">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-blue-500/20 border border-blue-400/40 text-cyan-300 flex items-center justify-center font-black text-lg">
-                  {currentUser.fullName.charAt(0)}{currentUser.surname.charAt(0)}
-                </div>
+                {currentUser.photoUrl ? (
+                  <img
+                    src={currentUser.photoUrl}
+                    alt={currentUser.fullName}
+                    className="w-12 h-12 rounded-full object-cover border border-cyan-400/50"
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-blue-500/20 border border-blue-400/40 text-cyan-300 flex items-center justify-center font-black text-lg">
+                    {currentUser.fullName.charAt(0)}{currentUser.surname.charAt(0)}
+                  </div>
+                )}
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-black text-white">{currentUser.fullName} {currentUser.surname}</h3>
@@ -277,7 +302,7 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
                         className="w-full p-3 rounded-xl hover:bg-[#00172e] text-left transition-colors flex items-center justify-between group border border-transparent hover:border-[#00284d]"
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className={`w-8 h-8 rounded-lg bg-[#00172e] group-hover:bg-[#002040] flex items-center justify-center shrink-0 transition-colors border border-[#00284d]`}>
+                          <div className="w-8 h-8 rounded-lg bg-[#00172e] group-hover:bg-[#002040] flex items-center justify-center shrink-0 transition-colors border border-[#00284d]">
                             <Icon className={`w-4 h-4 ${item.color}`} />
                           </div>
                           <div className="min-w-0">
@@ -319,7 +344,6 @@ export const CustomerNavDrawer: React.FC<CustomerNavDrawerProps> = ({
               <span>Log Out of Account</span>
             </button>
           </div>
-
         </div>
       </div>
     </div>

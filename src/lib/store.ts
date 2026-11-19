@@ -1,9 +1,33 @@
-import { collection, doc, setDoc, updateDoc, getDoc, getDocs, onSnapshot, query, where, orderBy, limit } from 'firebase/firestore';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
+import {
+  collection,
+  doc,
+  setDoc,
+  updateDoc,
+  getDoc,
+  getDocs,
+  onSnapshot,
+  query,
+  where,
+  runTransaction,
+  limit,
+  Unsubscribe,
+} from 'firebase/firestore';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged,
+  sendPasswordResetEmail,
+  updateProfile,
+  updatePassword,
+  User as FirebaseAuthUser,
+} from 'firebase/auth';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
 import {
   UserProfile,
   BankTransaction,
+  DepositRecord,
+  WithdrawalRecord,
   PaymentSubmission,
   VerificationRequest,
   BankNotification,
@@ -12,13 +36,25 @@ import {
   CardDetails,
   CardLimits,
   AdminAuditLog,
+  AuditActionType,
   SwiftRequest,
   ChatMessage,
   SupportConversation,
-  PaymentMethod
+  PaymentMethod,
+  AdminTier,
+  AdminRoleRecord,
+  InvestmentPlan,
+  UserInvestment,
+  ReferralRecord,
+  BankingPaymentInfo,
+  CardTokenSummary,
 } from '../types';
 
-// Default initial Financial Settings
+export const PRIMARY_SUPER_ADMIN_EMAILS = [
+  'newzelebarclaysupport@gmail.com',
+  'mohammedabdulateefmohammedshab@gmail.com',
+];
+
 export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   verificationFee: 50,
   tier2UpgradeFee: 500,
@@ -31,559 +67,503 @@ export const DEFAULT_FINANCIAL_SETTINGS: FinancialSettings = {
   tier3MonthlyLimit: 50000000,
   btcAddress: 'bc1qrc3ldwp9jrrtmlcua4czjnnkz49m6uahetuqgx',
   usdtAddress: '0x71C8705a3B344100B4180F494E662b2C8eF46C6E',
+  clearingBankName: 'Aegis Clearing Bank (UK)',
+  clearingBankAccountName: 'Aegis Global Clearing Treasury',
+  clearingBankAccountNumber: 'GB82 AEGS 2000 0084 9201 84',
+  clearingSwiftCode: 'AEGSGB2L',
+  clearingCountry: 'United Kingdom',
+  referralBonusAmount: 100,
   supportEmail: 'newzelebarclaysupport@gmail.com',
   requireSwiftCode: true,
-  updatedAt: new Date().toISOString()
+  updatedAt: new Date().toISOString(),
 };
 
-// Seed authorized administrator and corporate clearance accounts
-export const SEED_USERS: UserProfile[] = [
-  {
-    uid: 'demo_user_3',
-    accountNumber: '5521908234',
-    fullName: 'Mohammed',
-    surname: 'Shab',
-    email: 'mohammedabdulateefmohammedshab@gmail.com',
-    country: 'United Arab Emirates',
-    pin: '7788',
-    balance: 750000.00,
-    currency: 'USD',
-    tier: 'Tier 3',
-    status: 'active',
-    role: 'admin',
-    swiftVerificationCode: '9021',
-    swiftVerified: true,
-    createdAt: '2026-01-01T08:00:00Z',
-    updatedAt: new Date().toISOString(),
-    card: {
-      id: 'card_3',
-      cardNumber: '4552 1089 9021 8234',
-      cvv: '702',
-      expiryDate: '12/30',
-      cardholderName: 'MOHAMMED SHAB',
-      cardType: 'Aegis Platinum Digital Debit',
-      brand: 'aegis',
-      status: 'active',
-      spendingLimit: 250000,
-      dailyLimit: 25000,
-      monthlyLimit: 250000,
-      onlineTransactions: true,
-      internationalTransactions: true,
-      atmWithdrawals: true,
-      contactless: true,
-      activationCode: '9021',
-      issuerName: 'Aegis Card Services & Global Clearing Gateway',
-      limits: {
-        onlinePayments: true,
-        internationalUsage: true,
-        atmWithdrawals: true,
-        contactless: true
-      }
-    }
-  },
-  {
-    uid: 'admin_aegis_support',
-    accountNumber: '1000000001',
-    fullName: 'Aegis',
-    surname: 'Administrator',
-    email: 'newzelebarclaysupport@gmail.com',
-    country: 'United Kingdom',
-    pin: '5136',
-    passwordHash: 'Mmadu51366414@',
-    balance: 1000000.00,
-    currency: 'USD',
-    tier: 'Tier 3',
-    status: 'active',
-    role: 'admin',
-    swiftVerificationCode: '9021',
-    swiftVerified: true,
-    createdAt: '2026-01-01T08:00:00Z',
-    updatedAt: new Date().toISOString(),
-    card: {
-      id: 'card_admin',
-      cardNumber: '4552 1089 9021 5136',
-      cvv: '513',
-      expiryDate: '12/32',
-      cardholderName: 'AEGIS ADMINISTRATOR',
-      cardType: 'Aegis Platinum Digital Debit',
-      brand: 'aegis',
-      status: 'active',
-      spendingLimit: 500000,
-      dailyLimit: 50000,
-      monthlyLimit: 500000,
-      onlineTransactions: true,
-      internationalTransactions: true,
-      atmWithdrawals: true,
-      contactless: true,
-      activationCode: '9021',
-      issuerName: 'Aegis Card Services & Global Clearing Gateway',
-      limits: {
-        onlinePayments: true,
-        internationalUsage: true,
-        atmWithdrawals: true,
-        contactless: true
-      }
-    }
-  }
-];
-
-export const SEED_TRANSACTIONS: BankTransaction[] = [
-  {
-    id: 'tx_seed_1',
-    userId: 'demo_user_1',
-    accountNumber: '4829103847',
-    type: 'deposit',
-    amount: 25000.00,
-    currency: 'USD',
-    status: 'Completed',
-    senderName: 'Aegis Clearing London',
-    recipientName: 'Alexander Hamilton',
-    reference: 'AGS-DEP-994821',
-    description: 'Initial Institutional Liquidity Allocation',
-    createdAt: '2026-10-25T14:32:00Z',
-    updatedAt: '2026-10-25T14:32:00Z'
-  },
-  {
-    id: 'tx_seed_2',
-    userId: 'demo_user_1',
-    accountNumber: '4829103847',
-    type: 'deposit',
-    amount: 17500.00,
-    currency: 'USD',
-    status: 'Completed',
-    senderName: 'Standard Chartered Wire',
-    recipientName: 'Alexander Hamilton',
-    reference: 'AGS-DEP-773120',
-    description: 'International Commercial Settlement',
-    createdAt: '2026-11-01T10:15:00Z',
-    updatedAt: '2026-11-01T10:15:00Z'
-  },
-  {
-    id: 'tx_seed_3',
-    userId: 'demo_user_1',
-    accountNumber: '4829103847',
-    type: 'transfer',
-    amount: 4500.00,
-    currency: 'USD',
-    status: 'Pending',
-    senderName: 'Alexander Hamilton',
-    recipientName: 'Geneva Private Trust',
-    recipientBank: 'UBS Switzerland',
-    recipientCountry: 'Switzerland',
-    recipientAccountNumber: 'CH93 0024 0240 1234 5678',
-    swiftCode: 'UBSWCHZH',
-    reference: 'AGS-TR-382910',
-    description: 'Discretionary Asset Transfer (Pending Aegis Review)',
-    createdAt: '2026-11-04T16:45:00Z',
-    updatedAt: '2026-11-04T16:45:00Z'
-  }
-];
-
-export const SEED_PAYMENT_SUBMISSIONS: PaymentSubmission[] = [
-  {
-    id: 'pay_sub_1',
-    userId: 'demo_user_1',
-    accountNumber: '4829103847',
-    userFullName: 'Alexander Hamilton',
-    userEmail: 'a.hamilton@aegisbank.com',
-    method: 'BTC',
-    amount: 5000.00,
-    currency: 'USD',
-    txHashOrRef: '7f9a1c2d3e4b5a6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c',
-    walletAddress: 'bc1qrc3ldwp9jrrtmlcua4czjnnkz49m6uahetuqgx',
-    notes: '0.075 BTC transferred for trading account liquidity.',
-    status: 'Pending',
-    createdAt: '2026-11-05T06:12:00Z',
-    updatedAt: '2026-11-05T06:12:00Z'
-  }
-];
-
-export const SEED_VERIFICATION_REQUESTS: VerificationRequest[] = [
-  {
-    id: 'verif_sub_1',
-    userId: 'demo_user_1',
-    accountNumber: '4829103847',
-    fullName: 'Alexander Hamilton',
-    targetTier: 'Tier 2',
-    verificationType: 'facial',
-    mediaUrl: '',
-    feePaid: 500,
-    status: 'Pending Review',
-    notes: 'Facial biometric photograph submitted via Aegis Secure Portal.',
-    createdAt: '2026-11-05T05:30:00Z',
-    updatedAt: '2026-11-05T05:30:00Z'
-  }
-];
-
-export const SEED_NOTIFICATIONS: BankNotification[] = [
-  {
-    id: 'notif_seed_1',
-    userId: 'demo_user_1',
-    title: 'Welcome to Aegis Online Bank',
-    message: 'Your personal online banking profile and unique 10-digit account number 4829103847 have been generated and secured with 256-bit encryption.',
-    type: 'success',
-    read: false,
-    createdAt: '2026-10-25T14:30:00Z'
-  },
-  {
-    id: 'notif_seed_2',
-    userId: 'demo_user_1',
-    title: 'Wire Deposit Credited: $25,000.00',
-    message: 'A deposit from Aegis Clearing London in the exact amount of $25,000.00 has been credited to your account.',
-    type: 'transaction',
-    read: false,
-    createdAt: '2026-10-25T14:32:00Z'
-  }
-];
-
-// LocalStorage cache keys for high-availability & instant offline sync
-const CACHE_KEYS = {
-  USERS: 'aegis_cache_users_v4',
-  TRANSACTIONS: 'aegis_cache_transactions_v4',
-  PAYMENT_SUBMISSIONS: 'aegis_cache_payments_v4',
-  VERIFICATION_REQUESTS: 'aegis_cache_verifications_v4',
-  NOTIFICATIONS: 'aegis_cache_notifications_v4',
-  SETTINGS: 'aegis_cache_settings_v4',
-  CURRENT_USER_ID: 'aegis_active_user_id_v4',
-  AUDIT_LOGS: 'aegis_cache_audit_logs_v4',
-  SWIFT_REQUESTS: 'aegis_cache_swift_requests_v4',
-  CHAT_CONVERSATIONS: 'aegis_cache_chats_v4'
-};
-
-export const SEED_AUDIT_LOGS: AdminAuditLog[] = [
-  {
-    id: 'log_seed_1',
-    adminEmail: 'admin@aegis.bank',
-    action: 'ADMIN_LOGIN',
-    details: 'Administrator authenticated via 2-Factor Clearance from Central Operations Gateway',
-    timestamp: new Date(Date.now() - 3600000 * 4).toISOString()
-  },
-  {
-    id: 'log_seed_2',
-    adminEmail: 'admin@aegis.bank',
-    action: 'DEPOSIT_CREDITED',
-    targetAccount: '4829103847',
-    details: 'Administrative custody credit of $25,000.00 processed for Alexander Hamilton',
-    timestamp: new Date(Date.now() - 3600000 * 3).toISOString()
-  },
-  {
-    id: 'log_seed_3',
-    adminEmail: 'admin@aegis.bank',
-    action: 'TIER_UPGRADE_APPROVED',
-    targetAccount: '9182736450',
-    details: 'Tier 2 Biometric KYC verification approved for Victoria Sterling',
-    timestamp: new Date(Date.now() - 3600000 * 2).toISOString()
-  }
-];
-
-function getLocal<T>(key: string, fallback: T): T {
-  try {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return fallback;
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    return JSON.parse(raw);
-  } catch {
-    return fallback;
-  }
-}
-
-function setLocal(key: string, value: unknown) {
-  try {
-    if (typeof window === 'undefined' || typeof localStorage === 'undefined') return;
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch (e) {
-    console.error('LocalStorage write error:', e);
-  }
-}
-
-// Generate a random unique 10-digit account number
-export function generate10DigitAccountNumber(existingUsers: UserProfile[]): string {
-  let accNum = '';
-  let unique = false;
-  let attempts = 0;
-  while (!unique && attempts < 100) {
-    attempts++;
-    // Generate 10 digits starting with non-zero (4 to 9 for premium banking feel)
-    const firstDigit = Math.floor(Math.random() * 6) + 4; // 4 to 9
-    const remaining = Math.floor(100000000 + Math.random() * 900000000).toString();
-    accNum = `${firstDigit}${remaining.slice(0, 9)}`;
-    if (!existingUsers.some(u => u.accountNumber === accNum)) {
-      unique = true;
-    }
-  }
-  return accNum || '4829103847';
-}
-
-// Generate 4-digit SWIFT security verification code
 export function generate4DigitCode(): string {
   return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-/**
- * State Management & Real-time Database Store
- */
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
 class AegisStore {
   private users: UserProfile[] = [];
+  private admins: AdminRoleRecord[] = [];
   private transactions: BankTransaction[] = [];
+  private deposits: DepositRecord[] = [];
+  private withdrawals: WithdrawalRecord[] = [];
   private paymentSubmissions: PaymentSubmission[] = [];
   private verificationRequests: VerificationRequest[] = [];
+  private investmentPlans: InvestmentPlan[] = [];
+  private investments: UserInvestment[] = [];
+  private referrals: ReferralRecord[] = [];
+  private bankingProfiles: BankingPaymentInfo[] = [];
   private notifications: BankNotification[] = [];
   private auditLogs: AdminAuditLog[] = [];
   private swiftRequests: SwiftRequest[] = [];
   private chatConversations: SupportConversation[] = [];
   private settings: FinancialSettings = DEFAULT_FINANCIAL_SETTINGS;
+
   private currentUserId: string | null = null;
+  private currentAdminTier: AdminTier | null = null;
+  private authReady = false;
+  private registrationInProgress = false;
+  private activeUnsubscribes: Unsubscribe[] = [];
+  private publicUnsubscribes: Unsubscribe[] = [];
   private listeners: Set<() => void> = new Set();
-  private isInitialized = false;
 
   constructor() {
     this.initStore();
   }
 
   private initStore() {
-    // Load local cache
-    this.users = getLocal<UserProfile[]>(CACHE_KEYS.USERS, SEED_USERS);
-    this.transactions = getLocal<BankTransaction[]>(CACHE_KEYS.TRANSACTIONS, SEED_TRANSACTIONS);
-    this.paymentSubmissions = getLocal<PaymentSubmission[]>(CACHE_KEYS.PAYMENT_SUBMISSIONS, SEED_PAYMENT_SUBMISSIONS);
-    this.verificationRequests = getLocal<VerificationRequest[]>(CACHE_KEYS.VERIFICATION_REQUESTS, SEED_VERIFICATION_REQUESTS);
-    this.notifications = getLocal<BankNotification[]>(CACHE_KEYS.NOTIFICATIONS, SEED_NOTIFICATIONS);
-    this.auditLogs = getLocal<AdminAuditLog[]>(CACHE_KEYS.AUDIT_LOGS, SEED_AUDIT_LOGS);
-    this.swiftRequests = getLocal<SwiftRequest[]>(CACHE_KEYS.SWIFT_REQUESTS, []);
-    this.chatConversations = getLocal<SupportConversation[]>(CACHE_KEYS.CHAT_CONVERSATIONS, []);
-    this.settings = getLocal<FinancialSettings>(CACHE_KEYS.SETTINGS, DEFAULT_FINANCIAL_SETTINGS);
-    this.currentUserId = getLocal<string | null>(CACHE_KEYS.CURRENT_USER_ID, null);
+    this.subscribePublicCollections();
 
-    // Authoritative Admin Account Bootstrap (Requirement 1 & 2)
-    const adminEmail = 'newzelebarclaysupport@gmail.com';
-    let adminProfile = this.users.find(u => u.email.toLowerCase() === adminEmail);
-    if (!adminProfile) {
-      const seedAdmin = SEED_USERS.find(u => u.email.toLowerCase() === adminEmail);
-      if (seedAdmin) {
-        this.users.unshift({ ...seedAdmin });
-        setLocal(CACHE_KEYS.USERS, this.users);
+    onAuthStateChanged(auth, async (firebaseUser) => {
+      if (this.registrationInProgress) {
+        return;
       }
-    } else {
-      adminProfile.role = 'admin';
-      adminProfile.passwordHash = 'Mmadu51366414@';
-      setLocal(CACHE_KEYS.USERS, this.users);
-    }
 
-    // Purge legacy automated Welcome Credit transactions per Requirement 1 & 4
-    this.transactions = this.transactions.filter(t => 
-      t.description !== 'New Account Opening Welcome Credit' && 
-      !t.senderName?.includes('(Welcome Credit)')
-    );
+      this.clearUserSubscriptions();
 
-    this.isInitialized = true;
-    this.setupFirestoreSubscriptions();
+      if (!firebaseUser) {
+        this.resetAuthenticatedCollections();
+        this.currentUserId = null;
+        this.currentAdminTier = null;
+        this.authReady = true;
+        this.notify();
+        return;
+      }
+
+      try {
+        const profile = await this.ensureAuthenticatedUserSession(firebaseUser);
+        this.currentUserId = profile.uid;
+        this.authReady = true;
+
+        if (this.currentAdminTier) {
+          this.subscribeAdminCollections();
+        } else {
+          this.subscribeCustomerCollections(profile);
+        }
+        this.notify();
+      } catch (err) {
+        console.warn('Auth state sync error:', err);
+        this.authReady = true;
+        this.notify();
+      }
+    });
   }
 
-  private setupFirestoreSubscriptions() {
-    try {
-      // 1. Settings Listener
-      onSnapshot(doc(db, 'settings', 'financial'), (snapshot) => {
+  private resetAuthenticatedCollections() {
+    this.users = [];
+    this.admins = [];
+    this.transactions = [];
+    this.deposits = [];
+    this.withdrawals = [];
+    this.paymentSubmissions = [];
+    this.verificationRequests = [];
+    this.investments = [];
+    this.referrals = [];
+    this.bankingProfiles = [];
+    this.notifications = [];
+    this.auditLogs = [];
+    this.swiftRequests = [];
+    this.chatConversations = [];
+  }
+
+  private clearUserSubscriptions() {
+    this.activeUnsubscribes.forEach((unsub) => {
+      try {
+        unsub();
+      } catch {
+        // Ignore cleanup errors
+      }
+    });
+    this.activeUnsubscribes = [];
+  }
+
+  private subscribePublicCollections() {
+    // Public financial configuration
+    const settingsUnsub = onSnapshot(
+      doc(db, 'settings', 'financial'),
+      (snapshot) => {
         if (snapshot.exists()) {
-          this.settings = { ...DEFAULT_FINANCIAL_SETTINGS, ...(snapshot.data() as FinancialSettings) };
-          setLocal(CACHE_KEYS.SETTINGS, this.settings);
-          this.notify();
-        } else {
-          // Initialize remote settings if missing
-          setDoc(doc(db, 'settings', 'financial'), this.settings).catch(() => {});
-        }
-      }, (err) => {
-        console.warn('Firestore Settings snapshot error (using cached fallback):', err.message);
-      });
-
-      // 2. Users Listener - Real-time sync with automatic deduplication
-      onSnapshot(collection(db, 'users'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteUsers: UserProfile[] = [];
-          snapshot.forEach(d => {
-            remoteUsers.push(d.data() as UserProfile);
-          });
-          if (remoteUsers.length > 0) {
-            // Deduplicate and merge: prefer remote Firestore data, retain local unsynced if any
-            const mergedMap = new Map<string, UserProfile>();
-            for (const r of remoteUsers) {
-              const key = r.accountNumber || r.email.toLowerCase();
-              mergedMap.set(key, r);
-            }
-            for (const localU of this.users) {
-              const key = localU.accountNumber || localU.email.toLowerCase();
-              if (!mergedMap.has(key)) {
-                mergedMap.set(key, localU);
-              }
-            }
-            this.users = Array.from(mergedMap.values());
-            setLocal(CACHE_KEYS.USERS, this.users);
-            this.notify();
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore Users snapshot error (using cached fallback):', err.message);
-      });
-
-      // 3. Transactions Listener
-      onSnapshot(collection(db, 'transactions'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteTx: BankTransaction[] = [];
-          snapshot.forEach(d => {
-            const data = d.data() as BankTransaction;
-            if (data.description !== 'New Account Opening Welcome Credit' && !data.senderName?.includes('(Welcome Credit)')) {
-              remoteTx.push(data);
-            }
-          });
-          if (remoteTx.length > 0) {
-            const merged = [...remoteTx];
-            for (const localT of this.transactions) {
-              if (!merged.some(m => m.id === localT.id)) {
-                merged.push(localT);
-              }
-            }
-            this.transactions = merged
-              .filter(t => t.description !== 'New Account Opening Welcome Credit' && !t.senderName?.includes('(Welcome Credit)'))
-              .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
-            this.notify();
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore Transactions snapshot error:', err.message);
-      });
-
-      // 4. Payment Submissions Listener
-      onSnapshot(collection(db, 'payment_submissions'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteSubs: PaymentSubmission[] = [];
-          snapshot.forEach(d => {
-            remoteSubs.push(d.data() as PaymentSubmission);
-          });
-          if (remoteSubs.length > 0) {
-            const merged = [...remoteSubs];
-            for (const localS of this.paymentSubmissions) {
-              if (!merged.some(m => m.id === localS.id)) {
-                merged.push(localS);
-              }
-            }
-            this.paymentSubmissions = merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setLocal(CACHE_KEYS.PAYMENT_SUBMISSIONS, this.paymentSubmissions);
-            this.notify();
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore PaymentSubmissions snapshot error:', err.message);
-      });
-
-      // 5. Verification Requests Listener
-      onSnapshot(collection(db, 'verification_requests'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteReqs: VerificationRequest[] = [];
-          snapshot.forEach(d => {
-            remoteReqs.push(d.data() as VerificationRequest);
-          });
-          if (remoteReqs.length > 0) {
-            const merged = [...remoteReqs];
-            for (const localR of this.verificationRequests) {
-              if (!merged.some(m => m.id === localR.id)) {
-                merged.push(localR);
-              }
-            }
-            this.verificationRequests = merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setLocal(CACHE_KEYS.VERIFICATION_REQUESTS, this.verificationRequests);
-            this.notify();
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore VerificationRequests snapshot error:', err.message);
-      });
-
-      // 6. Notifications Listener
-      onSnapshot(collection(db, 'notifications'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteNotifs: BankNotification[] = [];
-          snapshot.forEach(d => {
-            remoteNotifs.push(d.data() as BankNotification);
-          });
-          if (remoteNotifs.length > 0) {
-            const merged = [...remoteNotifs];
-            for (const localN of this.notifications) {
-              if (!merged.some(m => m.id === localN.id)) {
-                merged.push(localN);
-              }
-            }
-            this.notifications = merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-            setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-            this.notify();
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore Notifications snapshot error:', err.message);
-      });
-
-      // 7. Audit Logs Listener
-      onSnapshot(collection(db, 'audit_logs'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteLogs: AdminAuditLog[] = [];
-          snapshot.forEach(d => {
-            remoteLogs.push(d.data() as AdminAuditLog);
-          });
-          if (remoteLogs.length > 0) {
-            const merged = [...remoteLogs];
-            for (const localL of this.auditLogs) {
-              if (!merged.some(m => m.id === localL.id)) {
-                merged.push(localL);
-              }
-            }
-            this.auditLogs = merged.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-            setLocal(CACHE_KEYS.AUDIT_LOGS, this.auditLogs);
-            this.notify();
-          }
-        }
-      }, (err) => {
-        console.warn('Firestore AuditLogs snapshot error:', err.message);
-      });
-
-      // 8. SWIFT Requests Listener
-      onSnapshot(collection(db, 'swift_requests'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteRequests: SwiftRequest[] = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-          this.swiftRequests = remoteRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
+          this.settings = {
+            ...DEFAULT_FINANCIAL_SETTINGS,
+            ...(snapshot.data() as FinancialSettings),
+          };
           this.notify();
         }
-      }, (err) => {
-        console.warn('Firestore SwiftRequests snapshot warning:', err.message);
-      });
+      },
+      (err) => console.warn('Public settings listener:', err.message)
+    );
+    this.publicUnsubscribes.push(settingsUnsub);
 
-      // 9. Support Chats Listener
-      onSnapshot(collection(db, 'chat_conversations'), (snapshot) => {
-        if (!snapshot.empty) {
-          const remoteChats: SupportConversation[] = snapshot.docs.map(d => ({ id: d.id, ...(d.data() as any) }));
-          this.chatConversations = remoteChats.sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
-          setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
-          this.notify();
+    // Public active investment plans
+    const plansUnsub = onSnapshot(
+      collection(db, 'investment_plans'),
+      (snapshot) => {
+        const list: InvestmentPlan[] = snapshot.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<InvestmentPlan, 'id'>),
+        }));
+        this.investmentPlans = list.sort(
+          (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+        this.notify();
+      },
+      (err) => console.warn('Investment plans listener:', err.message)
+    );
+    this.publicUnsubscribes.push(plansUnsub);
+  }
+
+  private async generateUniqueAccountNumberInFirestore(): Promise<string> {
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const firstDigit = Math.floor(Math.random() * 6) + 4;
+      const remaining = Math.floor(100000000 + Math.random() * 900000000).toString();
+      const candidate = `${firstDigit}${remaining.slice(0, 9)}`;
+      try {
+        const existing = await getDoc(doc(db, 'account_numbers', candidate));
+        if (!existing.exists()) {
+          return candidate;
         }
-      }, (err) => {
-        console.warn('Firestore ChatConversations snapshot warning:', err.message);
-      });
-
-      // 10. Firebase Auth State Persistence Sync across refreshes
-      onAuthStateChanged(auth, (firebaseUser) => {
-        if (firebaseUser) {
-          const found = this.users.find(u => 
-            u.uid === firebaseUser.uid || u.email.toLowerCase() === (firebaseUser.email || '').toLowerCase()
-          );
-          if (found) {
-            this.currentUserId = found.uid;
-            setLocal(CACHE_KEYS.CURRENT_USER_ID, found.uid);
-            this.notify();
-          }
-        }
-      });
-
-    } catch (e) {
-      console.warn('Setup subscriptions encountered initial warning:', e);
+      } catch {
+        return candidate;
+      }
     }
+    return `${Math.floor(4 + Math.random() * 5)}${String(Date.now()).slice(-9)}`;
+  }
+
+  /**
+   * Ensures an authenticated Firebase user has a valid Firestore user profile and admin tier resolved,
+   * while strictly preserving existing balances, account numbers, and histories.
+   */
+  private async ensureAuthenticatedUserSession(
+    firebaseUser: FirebaseAuthUser
+  ): Promise<UserProfile> {
+    const uid = firebaseUser.uid;
+    const emailLower = (firebaseUser.email || '').trim().toLowerCase();
+    const now = new Date().toISOString();
+
+    // 1. Check admins/{uid} first, bootstrapping primary Super Admins if authorized
+    let resolvedAdminTier: AdminTier | null = null;
+    try {
+      const adminSnap = await getDoc(doc(db, 'admins', uid));
+      if (adminSnap.exists()) {
+        const adminData = adminSnap.data() as AdminRoleRecord;
+        if (adminData.status === 'active') {
+          resolvedAdminTier = adminData.tier === 'tier1' ? 'tier1' : 'tier2';
+        }
+      } else if (PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
+        const superAdminRecord: AdminRoleRecord = {
+          uid,
+          email: emailLower,
+          username: emailLower.split('@')[0],
+          fullName: firebaseUser.displayName || 'Super Administrator',
+          tier: 'tier1',
+          status: 'active',
+          createdBy: 'system',
+          createdAt: now,
+          updatedAt: now,
+        };
+        await setDoc(doc(db, 'admins', uid), superAdminRecord);
+        resolvedAdminTier = 'tier1';
+      }
+    } catch (e) {
+      if (PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
+        resolvedAdminTier = 'tier1';
+      }
+      console.warn('Admin role lookup notice:', e);
+    }
+    this.currentAdminTier = resolvedAdminTier;
+
+    // 2. Load users/{uid} or migrate legacy Firestore doc matching email without losing balances
+    const userRef = doc(db, 'users', uid);
+    const userSnap = await getDoc(userRef);
+
+    let profile: UserProfile | null = null;
+
+    if (userSnap.exists()) {
+      profile = userSnap.data() as UserProfile;
+      // Synchronize admin role metadata if admin clearance was granted
+      if (resolvedAdminTier && (profile.role !== 'admin' || profile.adminTier !== resolvedAdminTier)) {
+        profile = {
+          ...profile,
+          role: 'admin',
+          adminTier: resolvedAdminTier,
+          updatedAt: now,
+        };
+        if (PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
+          try {
+            await updateDoc(userRef, {
+              role: 'admin',
+              adminTier: resolvedAdminTier,
+              updatedAt: now,
+            });
+          } catch {
+            // Rules might block non-admin role field writes; admins/{uid} remains authoritative
+          }
+        }
+      }
+    } else {
+      // Check if a pre-auth profile exists by email
+      try {
+        const emailQ = query(
+          collection(db, 'users'),
+          where('email', '==', emailLower),
+          limit(1)
+        );
+        const matchSnap = await getDocs(emailQ);
+        if (!matchSnap.empty) {
+          const legacyData = matchSnap.docs[0].data() as UserProfile;
+          profile = {
+            ...legacyData,
+            uid,
+            email: emailLower,
+            role: resolvedAdminTier ? 'admin' : legacyData.role || 'user',
+            ...(resolvedAdminTier ? { adminTier: resolvedAdminTier } : {}),
+            updatedAt: now,
+          };
+          await setDoc(userRef, profile);
+          await setDoc(
+            doc(db, 'account_numbers', profile.accountNumber),
+            {
+              uid,
+              accountNumber: profile.accountNumber,
+              email: emailLower,
+              fullName: `${profile.fullName} ${profile.surname}`.trim(),
+              createdAt: profile.createdAt || now,
+            },
+            { merge: true }
+          );
+        }
+      } catch (e) {
+        console.warn('Legacy user migration query note:', e);
+      }
+    }
+
+    if (!profile) {
+      const accountNumber = await this.generateUniqueAccountNumberInFirestore();
+      const displayParts = (firebaseUser.displayName || emailLower.split('@')[0] || 'Client').split(' ');
+      const firstName = displayParts[0] || 'Client';
+      const lastName = displayParts.slice(1).join(' ') || 'Member';
+      const username = emailLower.split('@')[0].replace(/[^a-zA-Z0-9_.-]/g, '');
+
+      profile = {
+        uid,
+        accountNumber,
+        username,
+        fullName: firstName,
+        surname: lastName,
+        email: emailLower,
+        country: 'United Kingdom',
+        pin: generate4DigitCode(),
+        photoUrl: firebaseUser.photoURL || '',
+        balance: 0,
+        currency: 'USD',
+        tier: 'Tier 1',
+        status: 'active',
+        role: resolvedAdminTier ? 'admin' : 'user',
+        ...(resolvedAdminTier ? { adminTier: resolvedAdminTier } : {}),
+        referralCode: `AEG-${accountNumber.slice(-6)}`,
+        createdAt: now,
+        updatedAt: now,
+      };
+      await setDoc(userRef, profile);
+      await setDoc(doc(db, 'account_numbers', accountNumber), {
+        uid,
+        accountNumber,
+        email: emailLower,
+        username: username.toLowerCase(),
+        fullName: `${profile.fullName} ${profile.surname}`.trim(),
+        createdAt: now,
+      });
+      await setDoc(doc(db, 'usernames', username.toLowerCase()), {
+        uid,
+        email: emailLower,
+        accountNumber,
+        username: username.toLowerCase(),
+      });
+      await setDoc(doc(db, 'referral_codes', `AEG-${accountNumber.slice(-6)}`), {
+        uid,
+        accountNumber,
+        email: emailLower,
+        code: `AEG-${accountNumber.slice(-6)}`,
+      });
+    }
+
+    // Update active local users array
+    const existingIdx = this.users.findIndex((u) => u.uid === profile!.uid);
+    if (existingIdx >= 0) {
+      this.users[existingIdx] = profile;
+    } else {
+      this.users.unshift(profile);
+    }
+
+    return profile;
+  }
+
+  private subscribeAdminCollections() {
+    const watch = <T extends object>(
+      colName: string,
+      setter: (items: T[]) => void,
+      sortField: string = 'createdAt'
+    ) => {
+      const unsub = onSnapshot(
+        collection(db, colName),
+        (snapshot) => {
+          const items = snapshot.docs.map((d) => {
+            const raw = d.data() as Record<string, any>;
+            if (colName === 'users' || colName === 'admins' || colName === 'banking_info') {
+              return { ...raw, uid: raw.uid || d.id } as T;
+            }
+            return { ...raw, id: raw.id || d.id } as T;
+          });
+          items.sort((a: any, b: any) => {
+            const ta = new Date(a[sortField] || a.updatedAt || 0).getTime();
+            const tb = new Date(b[sortField] || b.updatedAt || 0).getTime();
+            return tb - ta;
+          });
+          setter(items);
+          this.notify();
+        },
+        (err) => console.warn(`Admin subscription (${colName}):`, err.message)
+      );
+      this.activeUnsubscribes.push(unsub);
+    };
+
+    watch<UserProfile>('users', (items) => {
+      const map = new Map<string, UserProfile>();
+      for (const u of items) {
+        const key = u.uid || u.accountNumber || u.email.toLowerCase();
+        map.set(key, u);
+      }
+      this.users = Array.from(map.values());
+    });
+
+    watch<AdminRoleRecord>('admins', (items) => {
+      this.admins = items;
+      const myUid = auth.currentUser?.uid;
+      if (myUid) {
+        const myAdmin = items.find((a) => a.uid === myUid && a.status === 'active');
+        if (myAdmin) {
+          this.currentAdminTier = myAdmin.tier;
+        }
+      }
+    });
+
+    watch<BankTransaction>('transactions', (items) => {
+      this.transactions = items.filter(
+        (t) =>
+          t.description !== 'New Account Opening Welcome Credit' &&
+          !t.senderName?.includes('(Welcome Credit)')
+      );
+    });
+    watch<DepositRecord>('deposits', (items) => (this.deposits = items));
+    watch<WithdrawalRecord>('withdrawals', (items) => (this.withdrawals = items));
+    watch<PaymentSubmission>('payment_submissions', (items) => (this.paymentSubmissions = items));
+    watch<VerificationRequest>('verification_requests', (items) => (this.verificationRequests = items));
+    watch<UserInvestment>('investments', (items) => (this.investments = items));
+    watch<ReferralRecord>('referrals', (items) => (this.referrals = items));
+    watch<BankingPaymentInfo>('banking_info', (items) => (this.bankingProfiles = items), 'updatedAt');
+    watch<BankNotification>('notifications', (items) => (this.notifications = items));
+    watch<AdminAuditLog>('audit_logs', (items) => (this.auditLogs = items), 'timestamp');
+    watch<SwiftRequest>('swift_requests', (items) => (this.swiftRequests = items));
+    watch<SupportConversation>('chat_conversations', (items) => (this.chatConversations = items), 'lastMessageTime');
+  }
+
+  private subscribeCustomerCollections(profile: UserProfile) {
+    const uid = profile.uid;
+
+    // Customer's own user document
+    this.activeUnsubscribes.push(
+      onSnapshot(
+        doc(db, 'users', uid),
+        (snapshot) => {
+          if (snapshot.exists()) {
+            const updated = snapshot.data() as UserProfile;
+            this.users = [updated];
+            this.notify();
+          }
+        },
+        (err) => console.warn('Customer profile snapshot:', err.message)
+      )
+    );
+
+    // Customer's own banking profile
+    this.activeUnsubscribes.push(
+      onSnapshot(
+        doc(db, 'banking_info', uid),
+        (snapshot) => {
+          if (snapshot.exists()) {
+            this.bankingProfiles = [snapshot.data() as BankingPaymentInfo];
+          } else {
+            this.bankingProfiles = [];
+          }
+          this.notify();
+        },
+        (err) => console.warn('Banking info snapshot:', err.message)
+      )
+    );
+
+    // Customer's own chat conversation
+    this.activeUnsubscribes.push(
+      onSnapshot(
+        doc(db, 'chat_conversations', uid),
+        (snapshot) => {
+          if (snapshot.exists()) {
+            this.chatConversations = [{ id: snapshot.id, ...(snapshot.data() as Omit<SupportConversation, 'id'>) }];
+          } else {
+            this.chatConversations = [];
+          }
+          this.notify();
+        },
+        (err) => console.warn('Chat snapshot:', err.message)
+      )
+    );
+
+    const watchOwned = <T extends { id?: string }>(
+      colName: string,
+      field: string,
+      setter: (items: T[]) => void,
+      sortField: string = 'createdAt'
+    ) => {
+      const q = query(collection(db, colName), where(field, '==', uid));
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          const items = snapshot.docs.map((d) => ({
+            ...(d.data() as T),
+            id: (d.data() as any).id || d.id,
+          }));
+          items.sort((a: any, b: any) => {
+            const ta = new Date(a[sortField] || 0).getTime();
+            const tb = new Date(b[sortField] || 0).getTime();
+            return tb - ta;
+          });
+          setter(items);
+          this.notify();
+        },
+        (err) => console.warn(`Customer query (${colName}):`, err.message)
+      );
+      this.activeUnsubscribes.push(unsub);
+    };
+
+    watchOwned<BankTransaction>('transactions', 'userId', (items) => {
+      this.transactions = items.filter(
+        (t) =>
+          t.description !== 'New Account Opening Welcome Credit' &&
+          !t.senderName?.includes('(Welcome Credit)')
+      );
+    });
+    watchOwned<DepositRecord>('deposits', 'userId', (items) => (this.deposits = items));
+    watchOwned<WithdrawalRecord>('withdrawals', 'userId', (items) => (this.withdrawals = items));
+    watchOwned<PaymentSubmission>('payment_submissions', 'userId', (items) => (this.paymentSubmissions = items));
+    watchOwned<VerificationRequest>('verification_requests', 'userId', (items) => (this.verificationRequests = items));
+    watchOwned<UserInvestment>('investments', 'userId', (items) => (this.investments = items));
+    watchOwned<ReferralRecord>('referrals', 'referrerUid', (items) => (this.referrals = items));
+    watchOwned<BankNotification>('notifications', 'userId', (items) => (this.notifications = items));
+    watchOwned<SwiftRequest>('swift_requests', 'userId', (items) => (this.swiftRequests = items));
   }
 
   public subscribe(listener: () => void): () => void {
@@ -594,37 +574,91 @@ class AegisStore {
   }
 
   private notify() {
-    this.listeners.forEach(fn => fn());
+    this.listeners.forEach((fn) => fn());
   }
 
-  // Getters
+  // ==================== READ GETTERS ====================
+  public isAuthReady(): boolean {
+    return this.authReady;
+  }
+
   public getUsers(): UserProfile[] {
     return [...this.users];
   }
 
+  public getAdmins(): AdminRoleRecord[] {
+    return [...this.admins];
+  }
+
   public getCurrentUser(): UserProfile | null {
     if (!this.currentUserId) return null;
-    return this.users.find(u => u.uid === this.currentUserId) || null;
+    return this.users.find((u) => u.uid === this.currentUserId) || null;
+  }
+
+  public getCurrentAdminTier(): AdminTier | null {
+    return this.currentAdminTier;
+  }
+
+  public isCurrentUserAdmin(): boolean {
+    return this.currentAdminTier === 'tier1' || this.currentAdminTier === 'tier2';
+  }
+
+  public isTier1Admin(): boolean {
+    return this.currentAdminTier === 'tier1';
   }
 
   public getTransactions(userId?: string): BankTransaction[] {
     if (!userId) return [...this.transactions];
-    return this.transactions.filter(t => t.userId === userId);
+    return this.transactions.filter((t) => t.userId === userId);
+  }
+
+  public getDeposits(userId?: string): DepositRecord[] {
+    if (!userId) return [...this.deposits];
+    return this.deposits.filter((d) => d.userId === userId);
+  }
+
+  public getWithdrawals(userId?: string): WithdrawalRecord[] {
+    if (!userId) return [...this.withdrawals];
+    return this.withdrawals.filter((w) => w.userId === userId);
   }
 
   public getPaymentSubmissions(userId?: string): PaymentSubmission[] {
     if (!userId) return [...this.paymentSubmissions];
-    return this.paymentSubmissions.filter(p => p.userId === userId);
+    return this.paymentSubmissions.filter((p) => p.userId === userId);
   }
 
   public getVerificationRequests(userId?: string): VerificationRequest[] {
     if (!userId) return [...this.verificationRequests];
-    return this.verificationRequests.filter(v => v.userId === userId);
+    return this.verificationRequests.filter((v) => v.userId === userId);
+  }
+
+  public getInvestmentPlans(): InvestmentPlan[] {
+    return [...this.investmentPlans];
+  }
+
+  public getInvestments(userId?: string): UserInvestment[] {
+    if (!userId) return [...this.investments];
+    return this.investments.filter((i) => i.userId === userId);
+  }
+
+  public getReferrals(userId?: string): ReferralRecord[] {
+    if (!userId) return [...this.referrals];
+    return this.referrals.filter((r) => r.referrerUid === userId || r.referredUid === userId);
+  }
+
+  public getBankingInfo(userId?: string): BankingPaymentInfo | null {
+    const uid = userId || this.currentUserId;
+    if (!uid) return null;
+    return this.bankingProfiles.find((b) => b.uid === uid) || null;
+  }
+
+  public getAllBankingInfos(): BankingPaymentInfo[] {
+    return [...this.bankingProfiles];
   }
 
   public getNotifications(userId?: string): BankNotification[] {
     if (!userId) return [...this.notifications];
-    return this.notifications.filter(n => n.userId === userId);
+    return this.notifications.filter((n) => n.userId === userId);
   }
 
   public getSettings(): FinancialSettings {
@@ -635,700 +669,1363 @@ class AegisStore {
     return [...this.auditLogs];
   }
 
-  public async addAuditLog(entry: Omit<AdminAuditLog, 'id' | 'timestamp'>): Promise<AdminAuditLog> {
-    const newLog: AdminAuditLog = {
-      id: `audit_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      timestamp: new Date().toISOString(),
-      ...entry
-    };
-    this.auditLogs.unshift(newLog);
-    setLocal(CACHE_KEYS.AUDIT_LOGS, this.auditLogs);
-    this.notify();
-    try {
-      await setDoc(doc(db, 'audit_logs', newLog.id), newLog);
-    } catch (e) {
-      console.warn('Firestore write warning for audit_log:', e);
-    }
-    return newLog;
+  public getSwiftRequests(): SwiftRequest[] {
+    return [...this.swiftRequests];
+  }
+
+  public getUserByAccountNumber(accNum: string): UserProfile | null {
+    const clean = accNum.trim();
+    return this.users.find((u) => u.accountNumber === clean) || null;
+  }
+
+  public getUserById(uid: string): UserProfile | null {
+    return this.users.find((u) => u.uid === uid) || null;
+  }
+
+  public searchUsers(searchTerm: string): UserProfile[] {
+    const q = searchTerm.trim().toLowerCase();
+    if (!q) return [...this.users];
+    return this.users.filter(
+      (u) =>
+        u.accountNumber.includes(q) ||
+        u.email.toLowerCase().includes(q) ||
+        (u.username || '').toLowerCase().includes(q) ||
+        `${u.fullName} ${u.surname}`.toLowerCase().includes(q) ||
+        u.country.toLowerCase().includes(q)
+    );
   }
 
   public setCurrentUserId(uid: string | null) {
     this.currentUserId = uid;
-    setLocal(CACHE_KEYS.CURRENT_USER_ID, uid);
     this.notify();
   }
 
-  // Find user by 10-digit account number (Exact requirement: Administrator search)
-  public getUserByAccountNumber(accNum: string): UserProfile | null {
-    const clean = accNum.trim();
-    return this.users.find(u => u.accountNumber === clean) || null;
+  public async logoutUser(): Promise<void> {
+    this.clearUserSubscriptions();
+    this.resetAuthenticatedCollections();
+    this.currentUserId = null;
+    this.currentAdminTier = null;
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.warn('Sign out warning:', err);
+    }
+    this.notify();
   }
 
-  public getUserById(uid: string): UserProfile | null {
-    return this.users.find(u => u.uid === uid) || null;
+  // ==================== IMMUTABLE ADMIN ACTIVITY LOGS ====================
+  private getActorMetadata() {
+    const currentUser = this.getCurrentUser();
+    const firebaseUser = auth.currentUser;
+    return {
+      adminId: firebaseUser?.uid || currentUser?.uid || 'system',
+      adminEmail: firebaseUser?.email || currentUser?.email || 'system',
+      adminUsername:
+        currentUser?.username ||
+        (firebaseUser?.email ? firebaseUser.email.split('@')[0] : 'system'),
+      adminTier: (this.currentAdminTier || 'system') as AdminTier | 'system',
+    };
   }
 
-  // User Registration with Firebase Auth and Firestore synchronization
+  public async addAuditLog(
+    entry: Omit<AdminAuditLog, 'id' | 'timestamp' | 'adminEmail'> & { adminEmail?: string }
+  ): Promise<AdminAuditLog> {
+    const actor = this.getActorMetadata();
+    const newLog: AdminAuditLog = {
+      id: `audit_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+      timestamp: new Date().toISOString(),
+      adminId: entry.adminId || actor.adminId,
+      adminUsername: entry.adminUsername || actor.adminUsername,
+      adminEmail: entry.adminEmail || actor.adminEmail,
+      adminTier: entry.adminTier || actor.adminTier,
+      action: entry.action,
+      affectedUserId: entry.affectedUserId,
+      targetAccount: entry.targetAccount,
+      transactionId: entry.transactionId,
+      previousStatus: entry.previousStatus,
+      newStatus: entry.newStatus,
+      amount: entry.amount,
+      reason: entry.reason,
+      details: entry.details,
+    };
+
+    // Strip undefined fields before Firestore write
+    const cleanLog = Object.fromEntries(
+      Object.entries(newLog).filter(([, v]) => v !== undefined)
+    ) as AdminAuditLog;
+
+    this.auditLogs.unshift(cleanLog);
+    this.notify();
+
+    try {
+      await setDoc(doc(db, 'audit_logs', cleanLog.id), cleanLog);
+    } catch (e) {
+      console.warn('Audit log write warning:', e);
+    }
+    return cleanLog;
+  }
+
+  // ==================== AUTHENTICATION & REGISTRATION ====================
   public async registerUser(payload: {
+    username?: string;
     fullName: string;
     surname: string;
     email: string;
     country: string;
     pin: string;
-    password?: string;
+    password: string;
+    referralCode?: string;
   }): Promise<{ user: UserProfile; error?: string }> {
-    try {
-      const emailLower = payload.email.trim().toLowerCase();
-      if (this.users.some(u => u.email.toLowerCase() === emailLower)) {
-        return { user: null as any, error: 'An account with this email address is already registered.' };
-      }
+    const emailLower = payload.email.trim().toLowerCase();
+    const usernameClean = (
+      payload.username?.trim() || emailLower.split('@')[0]
+    )
+      .toLowerCase()
+      .replace(/[^a-z0-9_.-]/g, '');
 
-      // Generate unique 10-digit account number
-      const accountNumber = generate10DigitAccountNumber(this.users);
-      let finalUid = `user_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    if (!payload.password || payload.password.length < 8) {
+      return { user: null as any, error: 'Password must be at least 8 characters long.' };
+    }
 
-      // Synchronize with Firebase Authentication
-      if (payload.password && payload.password.length >= 6) {
-        try {
-          const authCred = await createUserWithEmailAndPassword(auth, emailLower, payload.password);
-          if (authCred?.user?.uid) {
-            finalUid = authCred.user.uid;
-          }
-        } catch (authErr: any) {
-          if (authErr?.code === 'auth/email-already-in-use') {
-            try {
-              const signinCred = await signInWithEmailAndPassword(auth, emailLower, payload.password);
-              if (signinCred?.user?.uid) {
-                finalUid = signinCred.user.uid;
-              }
-            } catch {
-              // Proceed with unique finalUid
-            }
-          }
+    // Check username availability if provided
+    if (usernameClean) {
+      try {
+        const usernameDoc = await getDoc(doc(db, 'usernames', usernameClean));
+        if (usernameDoc.exists()) {
+          return {
+            user: null as any,
+            error: 'This username is already taken. Please choose a different username.',
+          };
         }
+      } catch {
+        // Proceed if lookup unavailable
       }
+    }
 
-      // Requirement 1: Every newly registered customer starts with $0.00 balance
+    this.registrationInProgress = true;
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, emailLower, payload.password);
+      const finalUid = cred.user.uid;
+      const now = new Date().toISOString();
+
+      await updateProfile(cred.user, {
+        displayName: `${payload.fullName.trim()} ${payload.surname.trim()}`,
+      }).catch(() => {});
+
+      const accountNumber = await this.generateUniqueAccountNumberInFirestore();
+      const myReferralCode = `AEG-${accountNumber.slice(-6)}`;
+      const isSuperAdminEmail = PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower);
+
       const newUser: UserProfile = {
         uid: finalUid,
         accountNumber,
+        username: usernameClean,
         fullName: payload.fullName.trim(),
         surname: payload.surname.trim(),
         email: emailLower,
         country: payload.country,
         pin: payload.pin,
-        passwordHash: payload.password || '',
-        balance: 0.00, // Strictly $0.00 initial balance
+        photoUrl: '',
+        balance: 0.0,
         currency: 'USD',
         tier: 'Tier 1',
         status: 'active',
-        role: (emailLower === 'newzelebarclaysupport@gmail.com' || emailLower === 'mohammedabdulateefmohammedshab@gmail.com') ? 'admin' : 'user',
-        swiftVerificationCode: undefined,
+        role: isSuperAdminEmail ? 'admin' : 'user',
+        ...(isSuperAdminEmail ? { adminTier: 'tier1' as AdminTier } : {}),
+        referralCode: myReferralCode,
+        ...(payload.referralCode?.trim()
+          ? { referredBy: payload.referralCode.trim().toUpperCase() }
+          : {}),
         swiftVerified: false,
-        card: undefined,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
+        createdAt: now,
+        updatedAt: now,
       };
 
-      // Create welcome notification
       const welcomeNotif: BankNotification = {
         id: `notif_${Date.now()}`,
         userId: finalUid,
-        title: 'Account Registered Successfully!',
-        message: `Welcome, ${payload.fullName} ${payload.surname}! Your unique 10-digit Aegis Online Banking account number is ${accountNumber}. Your initial opening balance is $0.00 USD.`,
+        title: 'Account Registered Successfully',
+        message: `Welcome, ${newUser.fullName} ${newUser.surname}. Your permanent 10-digit account number is ${accountNumber}. Your opening balance is $0.00 USD.`,
         type: 'success',
         read: false,
-        createdAt: new Date().toISOString()
+        createdAt: now,
       };
 
-      // Optimistic local update
-      this.users.unshift(newUser);
-      this.notifications.unshift(welcomeNotif);
+      const defaultBankingInfo: BankingPaymentInfo = {
+        uid: finalUid,
+        accountNumber,
+        bankAccountName: `${newUser.fullName} ${newUser.surname}`,
+        bankAccountNumber: accountNumber,
+        bankName: 'Aegis Online Bank',
+        swiftBicCode: 'AEGSGB2L',
+        bankCountry: payload.country,
+        preferredMethod: 'Bank_Wire',
+        tokenizedCards: [],
+        updatedAt: now,
+      };
 
-      setLocal(CACHE_KEYS.USERS, this.users);
-      setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-      this.notify();
-
-      // Async write to Firestore: user profile, welcome notification, and account index
-      try {
-        await setDoc(doc(db, 'users', finalUid), newUser);
-        await setDoc(doc(db, 'notifications', welcomeNotif.id), welcomeNotif);
-        await setDoc(doc(db, 'account_numbers', accountNumber), {
+      await setDoc(doc(db, 'users', finalUid), newUser);
+      await setDoc(doc(db, 'account_numbers', accountNumber), {
+        uid: finalUid,
+        accountNumber,
+        email: emailLower,
+        username: usernameClean,
+        fullName: `${newUser.fullName} ${newUser.surname}`,
+        createdAt: now,
+      });
+      if (usernameClean) {
+        await setDoc(doc(db, 'usernames', usernameClean), {
           uid: finalUid,
-          accountNumber,
           email: emailLower,
-          fullName: `${payload.fullName} ${payload.surname}`,
-          createdAt: new Date().toISOString()
+          accountNumber,
+          username: usernameClean,
         });
-      } catch (e) {
-        console.warn('Firestore write warning during registration:', e);
       }
+      await setDoc(doc(db, 'referral_codes', myReferralCode), {
+        uid: finalUid,
+        accountNumber,
+        email: emailLower,
+        code: myReferralCode,
+      });
+      await setDoc(doc(db, 'banking_info', finalUid), defaultBankingInfo);
+      await setDoc(doc(db, 'notifications', welcomeNotif.id), welcomeNotif);
+
+      if (isSuperAdminEmail) {
+        const superAdminDoc: AdminRoleRecord = {
+          uid: finalUid,
+          email: emailLower,
+          username: usernameClean,
+          fullName: `${newUser.fullName} ${newUser.surname}`,
+          tier: 'tier1',
+          status: 'active',
+          createdBy: 'system',
+          createdAt: now,
+          updatedAt: now,
+        };
+        await setDoc(doc(db, 'admins', finalUid), superAdminDoc);
+      }
+
+      // Link referral record if a valid referral code or referrer account number was supplied
+      if (payload.referralCode?.trim()) {
+        await this.recordReferralSignup(newUser, payload.referralCode.trim());
+      }
+
+      // Sign out immediately after registration so user logs in intentionally via Sign In
+      await signOut(auth);
+      this.currentUserId = null;
+      this.currentAdminTier = null;
 
       return { user: newUser };
     } catch (err: any) {
-      return { user: null as any, error: err.message || 'Registration failed' };
+      let msg = err?.message || 'Registration failed.';
+      if (err?.code === 'auth/email-already-in-use') {
+        msg = 'An account with this email address already exists. Please sign in instead.';
+      } else if (err?.code === 'auth/weak-password') {
+        msg = 'Password is too weak. Please choose a stronger password.';
+      } else if (err?.code === 'auth/invalid-email') {
+        msg = 'Please enter a valid email address.';
+      }
+      return { user: null as any, error: msg };
+    } finally {
+      this.registrationInProgress = false;
     }
   }
 
-  // Force Instant Refresh from Firestore for Real-Time Sync
-  public async syncFromFirestoreNow(): Promise<{ count: number }> {
+  private async recordReferralSignup(newUser: UserProfile, rawCode: string) {
     try {
-      const snap = await getDocs(collection(db, 'users'));
-      if (!snap.empty) {
-        const remoteUsers: UserProfile[] = [];
-        snap.forEach(d => {
-          remoteUsers.push(d.data() as UserProfile);
-        });
-        const mergedMap = new Map<string, UserProfile>();
-        for (const r of remoteUsers) {
-          const key = r.accountNumber || r.email.toLowerCase();
-          mergedMap.set(key, r);
-        }
-        for (const localU of this.users) {
-          const key = localU.accountNumber || localU.email.toLowerCase();
-          if (!mergedMap.has(key)) {
-            mergedMap.set(key, localU);
+      const clean = rawCode.trim().toUpperCase();
+      let referrerAccountNum = '';
+      if (/^\d{10}$/.test(clean)) {
+        referrerAccountNum = clean;
+      } else if (clean.startsWith('AEG-')) {
+        const refCodeSnap = await getDoc(doc(db, 'referral_codes', clean));
+        if (refCodeSnap.exists()) {
+          const acc = refCodeSnap.data() as any;
+          if (acc.uid !== newUser.uid) {
+            const refRecord: ReferralRecord = {
+              id: `ref_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+              referrerUid: acc.uid,
+              referrerAccountNumber: acc.accountNumber,
+              referrerEmail: acc.email,
+              referredUid: newUser.uid,
+              referredAccountNumber: newUser.accountNumber,
+              referredEmail: newUser.email,
+              referredName: `${newUser.fullName} ${newUser.surname}`,
+              referralCode: clean,
+              rewardAmount: this.settings.referralBonusAmount ?? 100,
+              status: 'Pending',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            await setDoc(doc(db, 'referrals', refRecord.id), refRecord);
+            return;
           }
         }
-        this.users = Array.from(mergedMap.values());
-        setLocal(CACHE_KEYS.USERS, this.users);
-        this.notify();
+        const suffix = clean.replace('AEG-', '');
+        if (suffix.length === 10) referrerAccountNum = suffix;
       }
-      return { count: this.users.length };
-    } catch (e) {
-      console.warn('Manual Firestore sync warning:', e);
-      return { count: this.users.length };
-    }
-  }
 
-  // Password Recovery Flow
-  public async recoverPassword(identifier: string): Promise<{ success: boolean; message?: string; tempCode?: string; error?: string }> {
-    const trimmed = identifier.trim().toLowerCase();
-    const user = this.users.find(u => u.email.toLowerCase() === trimmed || u.accountNumber === trimmed);
-
-    if (!user) {
-      return { success: false, error: 'No account found matching this email or 10-digit account number.' };
-    }
-
-    // Generate secure temporary recovery token
-    const recoveryCode = String(Math.floor(100000 + Math.random() * 900000));
-    const tempPass = `Aegis#${Math.floor(1000 + Math.random() * 9000)}`;
-    user.passwordHash = tempPass;
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_reset_${Date.now()}`,
-      userId: user.uid,
-      title: 'Password Reset Notification',
-      message: `A security password reset request was processed. Your temporary access password is: ${tempPass}. Please log in and update your security settings immediately.`,
-      type: 'security',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { passwordHash: user.passwordHash, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning during password recovery:', e);
-    }
-
-    return {
-      success: true,
-      message: `Password reset instructions and your temporary credentials have been generated for ${user.email}. Temporary password: ${tempPass}`,
-      tempCode: tempPass
-    };
-  }
-
-  // Card Management: Activate Card with Authorized Card Issuer Verification
-  public async activateCard(userId: string, activationCode: string): Promise<{ success: boolean; error?: string }> {
-    const user = this.users.find(u => u.uid === userId);
-    if (!user || !user.card) {
-      return { success: false, error: 'No card record found for this customer account.' };
-    }
-
-    if (user.card.status === 'blocked') {
-      return { success: false, error: 'This card has been permanently blocked by Aegis Fraud Prevention and cannot be reactivated. Please request a replacement card.' };
-    }
-
-    if (user.card.status === 'active') {
-      return { success: false, error: 'Your card is already active and ready for domestic and international transactions.' };
-    }
-
-    const cleanCode = activationCode.trim();
-    // Validate against card activation code or user's security PIN
-    if (user.card.activationCode && cleanCode !== user.card.activationCode && cleanCode !== user.pin && cleanCode !== '1234') {
-      return { success: false, error: 'Invalid card activation authorization code. Please verify the code provided by Aegis Card Issuer or enter your secure 4-digit PIN.' };
-    }
-
-    user.card.status = 'active';
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_card_${Date.now()}`,
-      userId: user.uid,
-      title: 'Debit Card Activated Successfully',
-      message: `Your Aegis Platinum Debit Card ending in ${user.card.cardNumber.slice(-4)} has been activated with Aegis Issuer clearance. Online and contactless payments are now live.`,
-      type: 'success',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true };
-  }
-
-  // Card Management: Freeze / Unfreeze Toggle
-  public async toggleCardFreeze(userId: string): Promise<{ success: boolean; newStatus?: 'active' | 'frozen'; error?: string }> {
-    const user = this.users.find(u => u.uid === userId);
-    if (!user || !user.card) {
-      return { success: false, error: 'Card record not found.' };
-    }
-
-    if (user.card.status === 'blocked') {
-      return { success: false, error: 'Blocked cards cannot be frozen or unfrozen. A replacement card is required.' };
-    }
-
-    if (user.card.status === 'inactive') {
-      return { success: false, error: 'Please activate your card before managing freeze controls.' };
-    }
-
-    const newStatus = user.card.status === 'frozen' ? 'active' : 'frozen';
-    user.card.status = newStatus;
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_freeze_${Date.now()}`,
-      userId: user.uid,
-      title: newStatus === 'frozen' ? 'Card Temporarily Frozen' : 'Card Unfrozen & Active',
-      message: newStatus === 'frozen'
-        ? `Your Aegis card ending in ${user.card.cardNumber.slice(-4)} has been frozen. All new purchases, ATM withdrawals, and online transactions are blocked.`
-        : `Your Aegis card ending in ${user.card.cardNumber.slice(-4)} has been unfrozen and is ready for use.`,
-      type: newStatus === 'frozen' ? 'warning' : 'info',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true, newStatus };
-  }
-
-  // Card Management: Block Card (Lost / Stolen / Compromised)
-  public async blockCard(userId: string, reason: string): Promise<{ success: boolean; error?: string }> {
-    const user = this.users.find(u => u.uid === userId);
-    if (!user || !user.card) {
-      return { success: false, error: 'Card record not found.' };
-    }
-
-    user.card.status = 'blocked';
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_block_${Date.now()}`,
-      userId: user.uid,
-      title: 'Emergency Card Blocked',
-      message: `Your card ending in ${user.card.cardNumber.slice(-4)} has been permanently blocked. Reason: ${reason || 'Card reported lost/stolen'}. You can order an instant digital replacement in the Card Management center.`,
-      type: 'security',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true };
-  }
-
-  // Card Management: Request Replacement Card
-  public async requestReplacementCard(userId: string): Promise<{ success: boolean; card?: CardDetails; error?: string }> {
-    const user = this.users.find(u => u.uid === userId);
-    if (!user) return { success: false, error: 'User record not found.' };
-
-    const cardNum = `4532${user.accountNumber.slice(0, 4)}${Math.floor(10000000 + Math.random() * 90000000)}`.slice(0, 16);
-    const cardExpMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-    const cardExpYear = String((new Date().getFullYear() + 4) % 100).padStart(2, '0');
-    const cardExpiry = `${cardExpMonth}/${cardExpYear}`;
-    const cardCvv = String(Math.floor(100 + Math.random() * 900));
-
-    const newCard: CardDetails = {
-      id: `card_${Date.now()}`,
-      cardNumber: cardNum,
-      cardHolder: `${user.fullName} ${user.surname}`.toUpperCase(),
-      expiryDate: cardExpiry,
-      cvv: cardCvv,
-      cardType: 'Aegis Platinum Digital Debit',
-      brand: 'aegis',
-      status: 'inactive', // New card requires activation
-      activationCode: user.pin,
-      issuerName: 'Aegis Card Services & Global Clearing Gateway',
-      dailyLimit: 2500,
-      monthlyLimit: 25000,
-      issuedAt: new Date().toISOString(),
-      limits: {
-        onlinePayments: true,
-        internationalUsage: true,
-        atmWithdrawals: true,
-        contactless: true
+      if (referrerAccountNum) {
+        const accSnap = await getDoc(doc(db, 'account_numbers', referrerAccountNum));
+        if (accSnap.exists()) {
+          const acc = accSnap.data() as any;
+          if (acc.uid !== newUser.uid) {
+            const refRecord: ReferralRecord = {
+              id: `ref_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+              referrerUid: acc.uid,
+              referrerAccountNumber: acc.accountNumber,
+              referrerEmail: acc.email,
+              referredUid: newUser.uid,
+              referredAccountNumber: newUser.accountNumber,
+              referredEmail: newUser.email,
+              referredName: `${newUser.fullName} ${newUser.surname}`,
+              referralCode: clean,
+              rewardAmount: this.settings.referralBonusAmount ?? 100,
+              status: 'Pending',
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            await setDoc(doc(db, 'referrals', refRecord.id), refRecord);
+          }
+        }
       }
-    };
-
-    user.card = newCard;
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_newcard_${Date.now()}`,
-      userId: user.uid,
-      title: 'Replacement Card Issued',
-      message: `A new Aegis Platinum Debit Card ending in ${newCard.cardNumber.slice(-4)} has been generated. Please activate your card to begin using it.`,
-      type: 'info',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { card: newCard, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
     } catch (e) {
-      console.warn('Firestore write warning:', e);
+      console.warn('Referral linkage skipped:', e);
     }
-
-    return { success: true, card: newCard };
   }
 
-  // Card Management: Update Card Security Limits
-  public async updateCardSettings(userId: string, limits: Partial<CardLimits>): Promise<{ success: boolean; error?: string }> {
-    const user = this.users.find(u => u.uid === userId);
-    if (!user || !user.card) return { success: false, error: 'Card not found.' };
-
-    const existingLimits = user.card.limits || {
-      onlinePayments: true,
-      internationalUsage: true,
-      atmWithdrawals: true,
-      contactless: true
+  private async createReferralDoc(referrer: UserProfile, referred: UserProfile, code: string) {
+    if (referrer.uid === referred.uid) return;
+    const refRecord: ReferralRecord = {
+      id: `ref_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      referrerUid: referrer.uid,
+      referrerAccountNumber: referrer.accountNumber,
+      referrerEmail: referrer.email,
+      referredUid: referred.uid,
+      referredAccountNumber: referred.accountNumber,
+      referredEmail: referred.email,
+      referredName: `${referred.fullName} ${referred.surname}`,
+      referralCode: code,
+      rewardAmount: this.settings.referralBonusAmount ?? 100,
+      status: 'Pending',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
-
-    user.card.limits = {
-      ...existingLimits,
-      ...limits
-    };
-    user.updatedAt = new Date().toISOString();
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { card: user.card, updatedAt: user.updatedAt });
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true };
+    await setDoc(doc(db, 'referrals', refRecord.id), refRecord);
   }
 
-  // User Login (Email or 10-digit Account Number) - Unified for customers and administrators
-  public async loginUser(identifier: string, secret: string): Promise<{ user: UserProfile | null; error?: string }> {
+  /**
+   * Resolve email from Email, 10-Digit Account Number, or Username before Firebase Auth signIn.
+   */
+  private async resolveEmailForIdentifier(identifier: string): Promise<string | null> {
+    const trimmed = identifier.trim();
+    if (trimmed.includes('@')) {
+      return trimmed.toLowerCase();
+    }
+
+    if (/^\d{10}$/.test(trimmed)) {
+      const accSnap = await getDoc(doc(db, 'account_numbers', trimmed));
+      if (accSnap.exists()) {
+        return ((accSnap.data() as any).email || '').toLowerCase();
+      }
+    }
+
+    const unameSnap = await getDoc(doc(db, 'usernames', trimmed.toLowerCase()));
+    if (unameSnap.exists()) {
+      return ((unameSnap.data() as any).email || '').toLowerCase();
+    }
+
+    return null;
+  }
+
+  public async loginUser(
+    identifier: string,
+    secret: string
+  ): Promise<{ user: UserProfile | null; error?: string }> {
     const trimmed = identifier.trim();
     const cleanSecret = secret.trim();
 
-    // Find by 10-digit account number OR email
-    let user = this.users.find(u =>
-      (u.accountNumber === trimmed || u.email.toLowerCase() === trimmed.toLowerCase())
-    );
-
-    if (!user) {
-      // Direct Firestore check to guarantee instantaneous lookup for freshly registered accounts
-      try {
-        const isEmail = trimmed.includes('@');
-        if (!isEmail && /^\d{10}$/.test(trimmed)) {
-          const accDoc = await getDoc(doc(db, 'account_numbers', trimmed));
-          if (accDoc.exists()) {
-            const accData = accDoc.data();
-            if (accData.uid) {
-              const userDoc = await getDoc(doc(db, 'users', accData.uid));
-              if (userDoc.exists()) {
-                user = userDoc.data() as UserProfile;
-              }
-            }
-          }
-        }
-        if (!user) {
-          const q = query(
-            collection(db, 'users'),
-            where(isEmail ? 'email' : 'accountNumber', '==', isEmail ? trimmed.toLowerCase() : trimmed),
-            limit(1)
-          );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            user = snap.docs[0].data() as UserProfile;
-          }
-        }
-        if (user) {
-          const existingIdx = this.users.findIndex(u => u.uid === user!.uid || u.accountNumber === user!.accountNumber);
-          if (existingIdx >= 0) {
-            this.users[existingIdx] = user;
-          } else {
-            this.users.unshift(user);
-          }
-          setLocal(CACHE_KEYS.USERS, this.users);
-          this.notify();
-        }
-      } catch (lookupErr) {
-        console.warn('Firestore fallback lookup error during login:', lookupErr);
-      }
+    if (!trimmed || !cleanSecret) {
+      return { user: null, error: 'Please provide both your account identifier and password.' };
     }
 
-    if (!user) {
-      return { user: null, error: 'No account found with the provided credentials. Please check your account number or email.' };
-    }
-
-    // Verify either PIN (if 4-digit) or Password
-    const isPinMatch = user.pin === cleanSecret;
-    const isAdminCredMatch = (user.email.toLowerCase() === 'newzelebarclaysupport@gmail.com' && cleanSecret === 'Mmadu51366414@');
-    const isPassMatch = user.passwordHash === cleanSecret || isAdminCredMatch;
-
-    // Optional Firebase Auth backend verification
-    if (user.email && cleanSecret) {
-      try {
-        await signInWithEmailAndPassword(auth, user.email.toLowerCase(), cleanSecret);
-      } catch (authErr: any) {
-        if ((authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential') && isAdminCredMatch) {
-          try {
-            await createUserWithEmailAndPassword(auth, user.email.toLowerCase(), cleanSecret);
-          } catch {
-            // Continue with store validation
-          }
-        }
-      }
-    }
-
-    if (!isPinMatch && !isPassMatch && cleanSecret !== 'demo123' && cleanSecret !== 'Admin@1234#') {
-      return { user: null, error: 'Incorrect PIN or Password. Please try again.' };
-    }
-
-    if (user.role === 'admin' || user.email.toLowerCase() === 'newzelebarclaysupport@gmail.com') {
-      user.role = 'admin';
-      this.addAuditLog({
-        adminEmail: user.email,
-        action: 'MANAGEMENT_LOGIN',
-        details: 'Administrator authenticated via unified login gateway.'
-      });
-    }
-
-    this.setCurrentUserId(user.uid);
-    return { user };
-  }
-
-  // Dedicated Secure Admin Authentication (Requirement: Separate and Secure Admin Dashboard)
-  public async verifyAdminLogin(identifier: string, passkey: string): Promise<{ adminUser: UserProfile | null; error?: string }> {
-    const trimmed = identifier.trim().toLowerCase();
-    const cleanPass = passkey.trim();
-
-    // Find authorized admin user
-    const adminUser = this.users.find(u =>
-      (u.email.toLowerCase() === trimmed || u.accountNumber === trimmed) && u.role === 'admin'
-    );
-
-    if (!adminUser) {
-      return { adminUser: null, error: 'Access Denied: Unrecognized administrator account or insufficient clearance level.' };
-    }
-
-    // Authenticate with Firebase Authentication
-    let firebaseAuthSuccess = false;
     try {
-      await signInWithEmailAndPassword(auth, trimmed, cleanPass);
-      firebaseAuthSuccess = true;
-    } catch (authErr: any) {
-      // Auto-bootstrap user in Firebase Auth if not yet created in the project
-      if (authErr?.code === 'auth/user-not-found' || authErr?.code === 'auth/invalid-credential') {
-        try {
-          await createUserWithEmailAndPassword(auth, trimmed, cleanPass);
-          firebaseAuthSuccess = true;
-        } catch {
-          // Fall back to credential match below
-        }
+      const resolvedEmail = await this.resolveEmailForIdentifier(trimmed);
+      if (!resolvedEmail) {
+        return {
+          user: null,
+          error:
+            'No account found matching that email, username, or 10-digit account number.',
+        };
       }
+
+      const cred = await signInWithEmailAndPassword(auth, resolvedEmail, cleanSecret);
+      const profile = await this.ensureAuthenticatedUserSession(cred.user);
+
+      this.currentUserId = profile.uid;
+      this.authReady = true;
+      this.clearUserSubscriptions();
+      if (this.currentAdminTier) {
+        this.subscribeAdminCollections();
+        await this.addAuditLog({
+          adminEmail: profile.email,
+          action: 'MANAGEMENT_LOGIN',
+          details: `${this.currentAdminTier.toUpperCase()} administrator authenticated.`,
+        });
+      } else {
+        this.subscribeCustomerCollections(profile);
+      }
+
+      this.notify();
+      return { user: profile };
+    } catch (err: any) {
+      let msg = 'Invalid credentials. Please verify your email/account number and password.';
+      if (err?.code === 'auth/too-many-requests') {
+        msg = 'Too many failed login attempts. Please wait a moment or reset your password.';
+      } else if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') {
+        msg = 'Incorrect password. Please try again or use Password Recovery.';
+      } else if (err?.code === 'auth/user-not-found') {
+        msg = 'No authentication record found for this account.';
+      }
+      return { user: null, error: msg };
     }
-
-    const isMatch = firebaseAuthSuccess || 
-      adminUser.passwordHash === cleanPass || 
-      (trimmed === 'newzelebarclaysupport@gmail.com' && cleanPass === 'Mmadu51366414@') ||
-      cleanPass === 'Admin@1234#' || 
-      (adminUser.pin && cleanPass === adminUser.pin);
-
-    if (!isMatch) {
-      return { adminUser: null, error: 'Invalid administrative security credentials or passkey.' };
-    }
-
-    return { adminUser };
   }
 
-  // Administrator Action: Deposit Funds into customer account
-  // Requirement 3: "When the administrator makes a deposit and clicks Done, the exact deposited amount should appear in the user’s account balance, and the transaction should appear in their transaction history."
+  public async verifyAdminLogin(
+    identifier: string,
+    passkey: string
+  ): Promise<{ adminUser: UserProfile | null; error?: string }> {
+    const res = await this.loginUser(identifier, passkey);
+    if (res.error || !res.user) {
+      return { adminUser: null, error: res.error };
+    }
+    if (!this.isCurrentUserAdmin() && res.user.role !== 'admin') {
+      await this.logoutUser();
+      return {
+        adminUser: null,
+        error: 'Access Denied: Insufficient administrative clearance level.',
+      };
+    }
+    return { adminUser: res.user };
+  }
+
+  public async recoverPassword(
+    identifier: string
+  ): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      const email = await this.resolveEmailForIdentifier(identifier);
+      if (!email) {
+        return {
+          success: false,
+          error: 'No registered account found matching this email, username, or account number.',
+        };
+      }
+      await sendPasswordResetEmail(auth, email);
+      return {
+        success: true,
+        message: `A secure Firebase password reset email has been dispatched to ${email}. Check your inbox and spam folder to reset your password.`,
+      };
+    } catch (err: any) {
+      return {
+        success: false,
+        error: err?.message || 'Unable to send password reset email.',
+      };
+    }
+  }
+
+  public async syncFromFirestoreNow(): Promise<{ count: number }> {
+    if (!auth.currentUser) return { count: this.users.length };
+    if (this.isCurrentUserAdmin()) {
+      try {
+        const snap = await getDocs(collection(db, 'users'));
+        const list: UserProfile[] = snap.docs.map((d) => d.data() as UserProfile);
+        this.users = list;
+        this.notify();
+        return { count: list.length };
+      } catch (e) {
+        handleFirestoreError(e, OperationType.LIST, 'users');
+      }
+    } else {
+      const docSnap = await getDoc(doc(db, 'users', auth.currentUser.uid));
+      if (docSnap.exists()) {
+        this.users = [docSnap.data() as UserProfile];
+        this.notify();
+      }
+    }
+    return { count: this.users.length };
+  }
+
+  // ==================== PROFILE & SECURITY UPDATES ====================
+  public async updateUserProfile(
+    uid: string,
+    updates: {
+      username?: string;
+      fullName?: string;
+      surname?: string;
+      country?: string;
+      photoUrl?: string;
+      pin?: string;
+      currency?: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    const user = this.getUserById(uid);
+    if (!user) return { success: false, error: 'User profile not found.' };
+
+    const now = new Date().toISOString();
+    const cleanUpdates: Record<string, any> = { updatedAt: now };
+
+    if (updates.username !== undefined) {
+      const uname = updates.username.trim().toLowerCase().replace(/[^a-z0-9_.-]/g, '');
+      if (uname.length < 3) {
+        return { success: false, error: 'Username must be at least 3 characters.' };
+      }
+      if (uname !== user.username) {
+        const existing = await getDoc(doc(db, 'usernames', uname));
+        if (existing.exists() && (existing.data() as any).uid !== uid) {
+          return { success: false, error: 'That username is already in use.' };
+        }
+        await setDoc(doc(db, 'usernames', uname), {
+          uid,
+          email: user.email,
+          accountNumber: user.accountNumber,
+          username: uname,
+        });
+      }
+      cleanUpdates.username = uname;
+    }
+
+    if (updates.fullName !== undefined) cleanUpdates.fullName = updates.fullName.trim();
+    if (updates.surname !== undefined) cleanUpdates.surname = updates.surname.trim();
+    if (updates.country !== undefined) cleanUpdates.country = updates.country;
+    if (updates.photoUrl !== undefined) cleanUpdates.photoUrl = updates.photoUrl;
+    if (updates.pin !== undefined) cleanUpdates.pin = updates.pin;
+    if (updates.currency !== undefined) cleanUpdates.currency = updates.currency;
+
+    try {
+      await updateDoc(doc(db, 'users', uid), cleanUpdates);
+      if (auth.currentUser && auth.currentUser.uid === uid && (updates.fullName || updates.photoUrl)) {
+        await updateProfile(auth.currentUser, {
+          displayName: `${updates.fullName || user.fullName} ${updates.surname || user.surname}`,
+          ...(updates.photoUrl && updates.photoUrl.startsWith('http') ? { photoURL: updates.photoUrl } : {}),
+        }).catch(() => {});
+      }
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed to update profile.' };
+    }
+  }
+
+  public async updateUserPassword(newPassword: string): Promise<{ success: boolean; error?: string }> {
+    if (!auth.currentUser) {
+      return { success: false, error: 'You must be signed in to change your password.' };
+    }
+    try {
+      await updatePassword(auth.currentUser, newPassword);
+      const user = this.getCurrentUser();
+      if (user) {
+        await this.sendDirectNotification({
+          accountNumber: user.accountNumber,
+          title: 'Security Password Updated',
+          message: 'Your Firebase Authentication login password has been updated.',
+          type: 'security',
+        });
+      }
+      return { success: true };
+    } catch (err: any) {
+      if (err?.code === 'auth/requires-recent-login') {
+        return {
+          success: false,
+          error: 'For your security, please sign out and sign back in before changing your password.',
+        };
+      }
+      return { success: false, error: err?.message || 'Password update failed.' };
+    }
+  }
+
+  // ==================== BANKING & PAYMENT INFORMATION ====================
+  public async saveBankingPaymentInfo(
+    info: Omit<BankingPaymentInfo, 'updatedAt'>
+  ): Promise<{ success: boolean; error?: string }> {
+    const now = new Date().toISOString();
+    // Sanitize: ensure zero CVV or raw card digits can ever enter tokenizedCards
+    const safeCards: CardTokenSummary[] = (info.tokenizedCards || []).map((c) => ({
+      id: c.id,
+      brand: c.brand,
+      last4: String(c.last4).replace(/\D/g, '').slice(-4),
+      expiryMonth: String(c.expiryMonth).slice(0, 2),
+      expiryYear: String(c.expiryYear).slice(0, 4),
+      holderName: c.holderName.trim(),
+      tokenRef: c.tokenRef,
+      createdAt: c.createdAt || now,
+    }));
+
+    const payload: BankingPaymentInfo = {
+      uid: info.uid,
+      accountNumber: info.accountNumber,
+      bankAccountName: info.bankAccountName.trim(),
+      bankAccountNumber: info.bankAccountNumber.trim(),
+      bankName: info.bankName.trim(),
+      swiftBicCode: info.swiftBicCode.trim().toUpperCase(),
+      bankCountry: info.bankCountry.trim(),
+      preferredMethod: info.preferredMethod,
+      btcPayoutAddress: info.btcPayoutAddress?.trim() || '',
+      usdtPayoutAddress: info.usdtPayoutAddress?.trim() || '',
+      tokenizedCards: safeCards,
+      updatedAt: now,
+    };
+
+    try {
+      await setDoc(doc(db, 'banking_info', info.uid), payload, { merge: true });
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Failed to save banking details.' };
+    }
+  }
+
+  // ==================== DEPOSITS (ATOMIC FIRESTORE TRANSACTIONS) ====================
+  public async submitPaymentProof(params: {
+    userId: string;
+    method: PaymentMethod;
+    amount: number;
+    txHashOrRef: string;
+    proofImageUrl?: string;
+    notes?: string;
+  }): Promise<{ submission?: PaymentSubmission; deposit?: DepositRecord; error?: string }> {
+    const user = this.getUserById(params.userId);
+    if (!user) return { error: 'User profile not found.' };
+    if (params.amount <= 0 || isNaN(params.amount)) {
+      return { error: 'Please enter a valid deposit amount.' };
+    }
+
+    const now = new Date().toISOString();
+    const depId = `dep_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const walletAddress =
+      params.method === 'BTC'
+        ? this.settings.btcAddress
+        : params.method === 'USDT_ERC20'
+        ? this.settings.usdtAddress
+        : this.settings.clearingBankAccountNumber || 'GB82 AEGS 2000 0084 9201 84';
+
+    const depositRecord: DepositRecord = {
+      id: depId,
+      userId: user.uid,
+      accountNumber: user.accountNumber,
+      userFullName: `${user.fullName} ${user.surname}`,
+      userEmail: user.email,
+      method: params.method,
+      amount: roundMoney(params.amount),
+      currency: user.currency || 'USD',
+      txHashOrRef: params.txHashOrRef.trim() || `REF-${Date.now().toString(16).toUpperCase()}`,
+      walletAddress,
+      proofImageUrl: params.proofImageUrl || '',
+      notes: params.notes?.trim() || '',
+      status: 'Pending',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const paymentSub: PaymentSubmission = {
+      id: depId,
+      userId: user.uid,
+      accountNumber: user.accountNumber,
+      userFullName: `${user.fullName} ${user.surname}`,
+      userEmail: user.email,
+      method: params.method,
+      amount: depositRecord.amount,
+      currency: depositRecord.currency,
+      txHashOrRef: depositRecord.txHashOrRef,
+      walletAddress,
+      proofImageUrl: depositRecord.proofImageUrl,
+      notes: depositRecord.notes,
+      status: 'Pending',
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    const notif: BankNotification = {
+      id: `notif_${Date.now()}`,
+      userId: user.uid,
+      title: 'Deposit Request Submitted',
+      message: `Your deposit of $${depositRecord.amount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+      })} via ${params.method.replace('_', ' ')} is Pending verification. Funds will be credited once approved.`,
+      type: 'info',
+      read: false,
+      relatedId: depId,
+      createdAt: now,
+    };
+
+    try {
+      await setDoc(doc(db, 'deposits', depId), depositRecord);
+      await setDoc(doc(db, 'payment_submissions', depId), paymentSub);
+      await setDoc(doc(db, 'notifications', notif.id), notif);
+      return { submission: paymentSub, deposit: depositRecord };
+    } catch (e: any) {
+      return { error: e?.message || 'Failed to persist deposit submission.' };
+    }
+  }
+
+  /**
+   * Atomically approve a pending deposit or payment submission exactly once inside runTransaction.
+   */
+  public async adminApprovePaymentSubmission(
+    subId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.adminApproveDeposit(subId, reason);
+  }
+
+  public async adminApproveDeposit(
+    depositId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const actor = this.getActorMetadata();
+    const now = new Date().toISOString();
+
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const depRef = doc(db, 'deposits', depositId);
+        const subRef = doc(db, 'payment_submissions', depositId);
+        const [depSnap, subSnap] = await Promise.all([tx.get(depRef), tx.get(subRef)]);
+
+        const sourceData = (depSnap.exists()
+          ? depSnap.data()
+          : subSnap.exists()
+          ? subSnap.data()
+          : null) as DepositRecord | PaymentSubmission | null;
+
+        if (!sourceData) {
+          throw new Error('Deposit submission not found.');
+        }
+
+        // Strict idempotency guard against duplicate credits / race conditions
+        if (sourceData.status !== 'Pending') {
+          throw new Error(`Deposit is already marked as ${sourceData.status} and cannot be credited twice.`);
+        }
+
+        const userRef = doc(db, 'users', sourceData.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) {
+          throw new Error('Target customer profile not found in Firestore.');
+        }
+
+        const userData = userSnap.data() as UserProfile;
+        const previousBalance = Number(userData.balance || 0);
+        const amount = roundMoney(Number(sourceData.amount));
+        const newBalance = roundMoney(previousBalance + amount);
+
+        const txId = `tx_dep_${Date.now()}`;
+        const bankTx: BankTransaction = {
+          id: txId,
+          userId: userData.uid,
+          accountNumber: userData.accountNumber,
+          type: sourceData.method === 'Bank_Wire' ? 'deposit' : 'crypto_payment',
+          amount,
+          currency: sourceData.currency || 'USD',
+          status: 'Completed',
+          senderName: `${sourceData.method.replace('_', ' ')} Network Deposit`,
+          recipientName: `${userData.fullName} ${userData.surname}`,
+          reference: `AGS-DEP-${sourceData.txHashOrRef.slice(0, 8).toUpperCase()}`,
+          description: `Approved Deposit (${sourceData.method})${sourceData.notes ? `: ${sourceData.notes}` : ''}`,
+          previousBalance,
+          balanceAfter: newBalance,
+          linkedRecordId: depositId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const notifId = `notif_dep_${Date.now()}`;
+        const notif: BankNotification = {
+          id: notifId,
+          userId: userData.uid,
+          title: 'Deposit Approved & Credited',
+          message: `Your deposit of $${amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} (${sourceData.method.replace('_', ' ')}) has been approved and credited to your balance.`,
+          type: 'success',
+          read: false,
+          relatedId: depositId,
+          createdAt: now,
+        };
+
+        tx.update(userRef, { balance: newBalance, updatedAt: now });
+        if (depSnap.exists()) {
+          tx.update(depRef, {
+            status: 'Approved',
+            processedBy: actor.adminEmail,
+            processedAt: now,
+            reason: reason || 'Verified and approved',
+            updatedAt: now,
+          });
+        }
+        if (subSnap.exists()) {
+          tx.update(subRef, {
+            status: 'Approved',
+            processedBy: actor.adminEmail,
+            processedAt: now,
+            reason: reason || 'Verified and approved',
+            updatedAt: now,
+          });
+        }
+        tx.set(doc(db, 'transactions', txId), bankTx);
+        tx.set(doc(db, 'notifications', notifId), notif);
+
+        return { userData, amount, previousBalance, newBalance, txId };
+      });
+
+      await this.addAuditLog({
+        action: 'DEPOSIT_APPROVED',
+        affectedUserId: result.userData.uid,
+        targetAccount: result.userData.accountNumber,
+        transactionId: depositId,
+        previousStatus: 'Pending',
+        newStatus: 'Approved',
+        amount: result.amount,
+        reason: reason || 'Deposit verified and approved',
+        details: `Approved deposit #${depositId} (+$${result.amount.toFixed(2)}). Balance: $${result.previousBalance.toFixed(2)} -> $${result.newBalance.toFixed(2)}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to approve deposit.' };
+    }
+  }
+
+  public async adminCancelPaymentSubmission(
+    subId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    return this.adminCancelDeposit(subId, reason);
+  }
+
+  public async adminCancelDeposit(
+    depositId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const actor = this.getActorMetadata();
+    const now = new Date().toISOString();
+    const cancelReason = reason?.trim() || 'Deposit verification declined by administration.';
+
+    try {
+      const res = await runTransaction(db, async (tx) => {
+        const depRef = doc(db, 'deposits', depositId);
+        const subRef = doc(db, 'payment_submissions', depositId);
+        const [depSnap, subSnap] = await Promise.all([tx.get(depRef), tx.get(subRef)]);
+
+        const sourceData = (depSnap.exists()
+          ? depSnap.data()
+          : subSnap.exists()
+          ? subSnap.data()
+          : null) as DepositRecord | PaymentSubmission | null;
+
+        if (!sourceData) throw new Error('Deposit record not found.');
+        if (sourceData.status !== 'Pending') {
+          throw new Error(`Deposit is already ${sourceData.status} and cannot be cancelled.`);
+        }
+
+        if (depSnap.exists()) {
+          tx.update(depRef, {
+            status: 'Cancelled',
+            processedBy: actor.adminEmail,
+            processedAt: now,
+            reason: cancelReason,
+            updatedAt: now,
+          });
+        }
+        if (subSnap.exists()) {
+          tx.update(subRef, {
+            status: 'Cancelled',
+            processedBy: actor.adminEmail,
+            processedAt: now,
+            reason: cancelReason,
+            updatedAt: now,
+          });
+        }
+
+        const notifId = `notif_dep_can_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: sourceData.userId,
+          title: 'Deposit Request Cancelled',
+          message: `Your deposit request for $${Number(sourceData.amount).toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} was marked as Cancelled. Reason: ${cancelReason}. Your account balance remains unchanged.`,
+          type: 'warning',
+          read: false,
+          relatedId: depositId,
+          createdAt: now,
+        });
+
+        return { sourceData };
+      });
+
+      await this.addAuditLog({
+        action: 'DEPOSIT_CANCELLED',
+        affectedUserId: res.sourceData.userId,
+        targetAccount: res.sourceData.accountNumber,
+        transactionId: depositId,
+        previousStatus: 'Pending',
+        newStatus: 'Cancelled',
+        amount: Number(res.sourceData.amount),
+        reason: cancelReason,
+        details: `Cancelled deposit #${depositId} ($${Number(res.sourceData.amount).toFixed(2)}). Balance unaffected.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to cancel deposit.' };
+    }
+  }
+
+  /**
+   * Direct Administrative Deposit Credit (Tier 1 / Authorized Admin) inside runTransaction.
+   */
   public async adminDeposit(params: {
     accountNumber: string;
     amount: number;
     senderName: string;
     note?: string;
   }): Promise<{ success: boolean; error?: string }> {
-    const user = this.getUserByAccountNumber(params.accountNumber);
-    if (!user) {
-      return { success: false, error: `Account number ${params.accountNumber} not found.` };
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
     }
 
-    if (params.amount <= 0 || isNaN(params.amount)) {
+    const user = this.getUserByAccountNumber(params.accountNumber);
+    if (!user) return { success: false, error: `Account ${params.accountNumber} not found.` };
+
+    const amount = roundMoney(params.amount);
+    if (amount <= 0 || isNaN(amount)) {
       return { success: false, error: 'Please enter a valid deposit amount greater than zero.' };
     }
 
-    const previousBalance = user.balance;
-    const newBalance = Math.round((previousBalance + params.amount) * 100) / 100;
+    const now = new Date().toISOString();
     const sender = params.senderName.trim() || 'Aegis Treasury Services';
-
-    const txId = `tx_dep_${Date.now()}`;
-    const newTx: BankTransaction = {
-      id: txId,
-      userId: user.uid,
-      accountNumber: user.accountNumber,
-      type: 'deposit',
-      amount: params.amount,
-      currency: user.currency || 'USD',
-      status: 'Completed',
-      senderName: sender,
-      recipientName: `${user.fullName} ${user.surname}`,
-      reference: `AGS-DEP-${Math.floor(100000 + Math.random() * 900000)}`,
-      description: params.note?.trim() || `Administrative Deposit from ${sender}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      previousBalance
-    };
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: `Deposit Credited: +$${params.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
-      message: `Your account has been credited with $${params.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} from ${sender}. Your new balance is $${newBalance.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
-      type: 'transaction',
-      read: false,
-      relatedId: txId,
-      createdAt: new Date().toISOString()
-    };
-
-    // Update state
-    user.balance = newBalance;
-    user.updatedAt = new Date().toISOString();
-
-    this.transactions.unshift(newTx);
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    this.addAuditLog({
-      adminEmail: 'admin@aegis.bank',
-      action: 'DEPOSIT_CREDITED',
-      targetAccount: user.accountNumber,
-      details: `Administrative custody credit of $${params.amount.toFixed(2)} processed for ${user.fullName} ${user.surname}. Sender: ${sender}`
-    });
-
-    // Sync to Firestore
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { balance: newBalance, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'transactions', txId), newTx);
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning in adminDeposit:', e);
-    }
-
-    return { success: true };
-  }
-
-  // Administrator Action: Suspend or Reactivate Customer Account
-  public async adminToggleUserSuspension(accountNumber: string, reason?: string): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
-    const user = this.getUserByAccountNumber(accountNumber);
-    if (!user) return { success: false, error: `Customer account ${accountNumber} not found.` };
-
-    const newStatus = user.status === 'suspended' ? 'active' : 'suspended';
-    user.status = newStatus;
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_status_${Date.now()}`,
-      userId: user.uid,
-      title: newStatus === 'suspended' ? 'Account Security Suspension' : 'Account Re-Activated',
-      message: newStatus === 'suspended' 
-        ? (reason || 'Your account has been temporarily restricted by Central Administrative Security. Please contact Support.')
-        : 'Your account restrictions have been cleared. Full transaction privileges have been restored.',
-      type: newStatus === 'suspended' ? 'security' : 'success',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-    this.notifications.unshift(notif);
-
-    this.addAuditLog({
-      adminEmail: 'admin@aegis.bank',
-      action: newStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_REACTIVATED',
-      targetAccount: user.accountNumber,
-      details: `Account for ${user.fullName} ${user.surname} set to '${newStatus}'. Reason: ${reason || 'Administrative Security Protocol'}`
-    });
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
+    const actor = this.getActorMetadata();
 
     try {
-      await updateDoc(doc(db, 'users', user.uid), { status: newStatus, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning in adminToggleUserSuspension:', e);
-    }
+      const result = await runTransaction(db, async (tx) => {
+        const userRef = doc(db, 'users', user.uid);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('Customer record not found.');
 
-    return { success: true, user };
+        const uData = userSnap.data() as UserProfile;
+        const previousBalance = Number(uData.balance || 0);
+        const newBalance = roundMoney(previousBalance + amount);
+
+        const txId = `tx_dep_${Date.now()}`;
+        const depId = `dep_adm_${Date.now()}`;
+
+        const newTx: BankTransaction = {
+          id: txId,
+          userId: uData.uid,
+          accountNumber: uData.accountNumber,
+          type: 'deposit',
+          amount,
+          currency: uData.currency || 'USD',
+          status: 'Completed',
+          senderName: sender,
+          recipientName: `${uData.fullName} ${uData.surname}`,
+          reference: `AGS-DEP-${Math.floor(100000 + Math.random() * 900000)}`,
+          description: params.note?.trim() || `Administrative Deposit from ${sender}`,
+          previousBalance,
+          balanceAfter: newBalance,
+          linkedRecordId: depId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const depositDoc: DepositRecord = {
+          id: depId,
+          userId: uData.uid,
+          accountNumber: uData.accountNumber,
+          userFullName: `${uData.fullName} ${uData.surname}`,
+          userEmail: uData.email,
+          method: 'Bank_Wire',
+          amount,
+          currency: uData.currency || 'USD',
+          txHashOrRef: newTx.reference,
+          walletAddress: sender,
+          notes: newTx.description,
+          status: 'Approved',
+          processedBy: actor.adminEmail,
+          processedAt: now,
+          reason: 'Direct administrative custody credit',
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const notifId = `notif_${Date.now()}`;
+        tx.update(userRef, { balance: newBalance, updatedAt: now });
+        tx.set(doc(db, 'deposits', depId), depositDoc);
+        tx.set(doc(db, 'transactions', txId), newTx);
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: uData.uid,
+          title: `Deposit Credited: +$${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`,
+          message: `Your account has been credited with $${amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} from ${sender}. Available balance: $${newBalance.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })}.`,
+          type: 'transaction',
+          read: false,
+          relatedId: txId,
+          createdAt: now,
+        });
+
+        return { uData, previousBalance, newBalance, txId };
+      });
+
+      await this.addAuditLog({
+        action: 'DEPOSIT_CREDITED',
+        affectedUserId: result.uData.uid,
+        targetAccount: result.uData.accountNumber,
+        transactionId: result.txId,
+        previousStatus: 'N/A',
+        newStatus: 'Completed',
+        amount,
+        reason: params.note?.trim() || `Direct custody credit from ${sender}`,
+        details: `Direct deposit of $${amount.toFixed(2)} credited to ${result.uData.accountNumber}. Balance: $${result.previousBalance.toFixed(2)} -> $${result.newBalance.toFixed(2)}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Administrative deposit failed.' };
+    }
   }
 
-  // User Transfer Initiation
-  // Requirement 9: "When a user initiates a transfer, the transaction should initially appear as Pending. The transfer amount should not be deducted from the user’s available balance until the transaction is successfully processed and confirmed."
+  // ==================== WITHDRAWALS (ATOMIC RESERVATION & REFUND ON CANCEL) ====================
+  /**
+   * Customer submits a withdrawal request: atomically reserves & deducts amount from balance
+   * inside runTransaction and writes withdrawals/{id} + transactions/{txId} as Pending.
+   */
+  public async submitWithdrawal(params: {
+    userId: string;
+    method: 'bank' | 'crypto';
+    amount: number;
+    beneficiaryName: string;
+    destination: string;
+    bankName?: string;
+    swiftCode?: string;
+    country?: string;
+    pin: string;
+  }): Promise<{ withdrawal?: WithdrawalRecord; transaction?: BankTransaction; error?: string }> {
+    const amount = roundMoney(params.amount);
+    if (amount <= 0 || isNaN(amount)) {
+      return { error: 'Please enter a valid withdrawal amount.' };
+    }
+
+    const now = new Date().toISOString();
+    const wId = `wd_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const txId = `tx_wd_${Date.now()}`;
+
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const userRef = doc(db, 'users', params.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('Customer account not found.');
+
+        const uData = userSnap.data() as UserProfile;
+        if (uData.status === 'suspended') {
+          throw new Error('Your account has been suspended. Kindly contact support for more assistance.');
+        }
+        if (params.pin !== uData.pin) {
+          throw new Error('Invalid 4-digit Secure PIN entered.');
+        }
+
+        const previousBalance = Number(uData.balance || 0);
+        if (amount > previousBalance) {
+          throw new Error(
+            `Insufficient funds. Available balance: $${previousBalance.toLocaleString('en-US', {
+              minimumFractionDigits: 2,
+            })}.`
+          );
+        }
+
+        const newBalance = roundMoney(previousBalance - amount);
+
+        const withdrawalDoc: WithdrawalRecord = {
+          id: wId,
+          userId: uData.uid,
+          accountNumber: uData.accountNumber,
+          userFullName: `${uData.fullName} ${uData.surname}`,
+          userEmail: uData.email,
+          method: params.method,
+          amount,
+          currency: uData.currency || 'USD',
+          beneficiaryName: params.beneficiaryName.trim() || `${uData.fullName} ${uData.surname}`,
+          destination: params.destination.trim(),
+          bankName:
+            params.bankName?.trim() ||
+            (params.method === 'bank' ? 'External Financial Institution' : 'Private Crypto Custody'),
+          swiftCode: params.swiftCode?.trim().toUpperCase() || '',
+          country: params.country || uData.country,
+          status: 'Pending',
+          balanceReserved: true,
+          reservedAmount: amount,
+          linkedTxId: txId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const txDoc: BankTransaction = {
+          id: txId,
+          userId: uData.uid,
+          accountNumber: uData.accountNumber,
+          type: 'withdrawal',
+          amount,
+          currency: uData.currency || 'USD',
+          status: 'Pending',
+          senderName: `${uData.fullName} ${uData.surname}`,
+          senderAccountNumber: uData.accountNumber,
+          recipientName: withdrawalDoc.beneficiaryName,
+          recipientAccountNumber: withdrawalDoc.destination,
+          recipientBank: withdrawalDoc.bankName,
+          recipientCountry: withdrawalDoc.country,
+          swiftCode: withdrawalDoc.swiftCode,
+          reference: `AEG-WD-${Math.floor(100000 + Math.random() * 900000)}`,
+          description: `Direct Withdrawal (${params.method === 'bank' ? 'Bank Account' : 'Crypto Wallet'})`,
+          previousBalance,
+          balanceAfter: newBalance,
+          linkedRecordId: wId,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const notifId = `notif_wd_${Date.now()}`;
+        tx.set(doc(db, 'withdrawals', wId), withdrawalDoc);
+        tx.set(doc(db, 'transactions', txId), txDoc);
+        tx.update(userRef, {
+          balance: newBalance,
+          lastBalanceLockId: wId,
+          lastBalanceLockType: 'withdrawal',
+          updatedAt: now,
+        });
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: uData.uid,
+          title: 'Withdrawal Request Submitted (Pending)',
+          message: `Your withdrawal of $${amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} has been queued as Pending. The reserved funds will be released upon approval or refunded if cancelled.`,
+          type: 'transaction',
+          read: false,
+          relatedId: wId,
+          createdAt: now,
+        });
+
+        return { withdrawalDoc, txDoc };
+      });
+
+      return { withdrawal: result.withdrawalDoc, transaction: result.txDoc };
+    } catch (err: any) {
+      return { error: err?.message || 'Withdrawal submission failed.' };
+    }
+  }
+
+  public async adminApproveWithdrawal(
+    withdrawalId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const actor = this.getActorMetadata();
+    const now = new Date().toISOString();
+
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const wdRef = doc(db, 'withdrawals', withdrawalId);
+        const wdSnap = await tx.get(wdRef);
+        if (!wdSnap.exists()) throw new Error('Withdrawal record not found.');
+
+        const wd = wdSnap.data() as WithdrawalRecord;
+        if (wd.status !== 'Pending') {
+          throw new Error(`Withdrawal is already ${wd.status}.`);
+        }
+
+        const userRef = doc(db, 'users', wd.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('User record not found.');
+
+        const userData = userSnap.data() as UserProfile;
+        const amount = roundMoney(Number(wd.amount));
+
+        // If balance was NOT reserved upon submission (legacy entry), deduct once now
+        if (!wd.balanceReserved) {
+          if (Number(userData.balance || 0) < amount) {
+            throw new Error(`Customer has insufficient balance ($${userData.balance}) for this withdrawal.`);
+          }
+          tx.update(userRef, {
+            balance: roundMoney(Number(userData.balance) - amount),
+            updatedAt: now,
+          });
+        }
+
+        tx.update(wdRef, {
+          status: 'Approved',
+          processedBy: actor.adminEmail,
+          processedAt: now,
+          reason: reason?.trim() || 'Withdrawal authorized and disbursed.',
+          updatedAt: now,
+        });
+
+        if (wd.linkedTxId) {
+          const linkedTxRef = doc(db, 'transactions', wd.linkedTxId);
+          const linkedTxSnap = await tx.get(linkedTxRef);
+          if (linkedTxSnap.exists()) {
+            tx.update(linkedTxRef, {
+              status: 'Completed',
+              reason: reason?.trim() || 'Withdrawal approved',
+              updatedAt: now,
+            });
+          }
+        }
+
+        const notifId = `notif_wd_app_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: wd.userId,
+          title: 'Withdrawal Approved & Disbursed',
+          message: `Your withdrawal request of $${amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} to ${wd.destination} has been approved and processed.`,
+          type: 'success',
+          read: false,
+          relatedId: wd.id,
+          createdAt: now,
+        });
+
+        return { wd, amount };
+      });
+
+      await this.addAuditLog({
+        action: 'WITHDRAWAL_APPROVED',
+        affectedUserId: result.wd.userId,
+        targetAccount: result.wd.accountNumber,
+        transactionId: result.wd.id,
+        previousStatus: 'Pending',
+        newStatus: 'Approved',
+        amount: result.amount,
+        reason: reason?.trim() || 'Withdrawal approved for payout',
+        details: `Approved withdrawal #${result.wd.id} ($${result.amount.toFixed(2)}) for ${result.wd.accountNumber}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to approve withdrawal.' };
+    }
+  }
+
+  public async adminCancelWithdrawal(
+    withdrawalId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const actor = this.getActorMetadata();
+    const now = new Date().toISOString();
+    const cancelReason = reason?.trim() || 'Withdrawal cancelled; reserved balance returned.';
+
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const wdRef = doc(db, 'withdrawals', withdrawalId);
+        const wdSnap = await tx.get(wdRef);
+        if (!wdSnap.exists()) throw new Error('Withdrawal record not found.');
+
+        const wd = wdSnap.data() as WithdrawalRecord;
+        if (wd.status !== 'Pending') {
+          throw new Error(`Withdrawal is already ${wd.status}.`);
+        }
+
+        const userRef = doc(db, 'users', wd.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('User record not found.');
+
+        const userData = userSnap.data() as UserProfile;
+        const refundAmount = roundMoney(Number(wd.reservedAmount ?? wd.amount));
+        const previousBalance = Number(userData.balance || 0);
+        const restoredBalance = wd.balanceReserved
+          ? roundMoney(previousBalance + refundAmount)
+          : previousBalance;
+
+        if (wd.balanceReserved) {
+          tx.update(userRef, {
+            balance: restoredBalance,
+            updatedAt: now,
+          });
+        }
+
+        tx.update(wdRef, {
+          status: 'Cancelled',
+          processedBy: actor.adminEmail,
+          processedAt: now,
+          reason: cancelReason,
+          updatedAt: now,
+        });
+
+        if (wd.linkedTxId) {
+          const linkedTxRef = doc(db, 'transactions', wd.linkedTxId);
+          const linkedTxSnap = await tx.get(linkedTxRef);
+          if (linkedTxSnap.exists()) {
+            tx.update(linkedTxRef, {
+              status: 'Reversed',
+              reason: cancelReason,
+              balanceAfter: restoredBalance,
+              updatedAt: now,
+            });
+          }
+        }
+
+        const notifId = `notif_wd_can_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: wd.userId,
+          title: 'Withdrawal Cancelled & Funds Refunded',
+          message: `Your withdrawal of $${refundAmount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} was cancelled (${cancelReason}). The exact amount has been returned to your available balance ($${restoredBalance.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })}).`,
+          type: 'warning',
+          read: false,
+          relatedId: wd.id,
+          createdAt: now,
+        });
+
+        return { wd, refundAmount, previousBalance, restoredBalance };
+      });
+
+      await this.addAuditLog({
+        action: 'WITHDRAWAL_CANCELLED',
+        affectedUserId: result.wd.userId,
+        targetAccount: result.wd.accountNumber,
+        transactionId: result.wd.id,
+        previousStatus: 'Pending',
+        newStatus: 'Cancelled',
+        amount: result.refundAmount,
+        reason: cancelReason,
+        details: `Cancelled withdrawal #${result.wd.id} and refunded $${result.refundAmount.toFixed(2)}. Balance: $${result.previousBalance.toFixed(2)} -> $${result.restoredBalance.toFixed(2)}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to cancel withdrawal.' };
+    }
+  }
+
+  // ==================== TRANSFERS & TRANSACTIONS (ATOMIC) ====================
   public async initiateTransfer(params: {
     userId: string;
     amount: number;
@@ -1340,49 +2037,57 @@ class AegisStore {
     verificationCode: string;
     description?: string;
   }): Promise<{ transaction?: BankTransaction; error?: string }> {
-    const user = this.users.find(u => u.uid === params.userId);
+    const user = this.users.find((u) => u.uid === params.userId);
     if (!user) return { error: 'User session not found.' };
 
-    // Account Restriction Check
     if (user.status === 'suspended') {
       return { error: 'Your account has been suspended. Kindly contact support for more assistance.' };
     }
 
-    if (params.amount <= 0 || isNaN(params.amount)) {
+    const amount = roundMoney(params.amount);
+    if (amount <= 0 || isNaN(amount)) {
       return { error: 'Please enter a valid transfer amount.' };
     }
 
-    if (params.amount > user.balance) {
-      return { error: `Insufficient funds. Your available balance is $${user.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}.` };
+    if (amount > user.balance) {
+      return {
+        error: `Insufficient funds. Your available balance is $${user.balance.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+        })}.`,
+      };
     }
 
-    // Check tier daily limit
-    const dailyLimit = user.tier === 'Tier 1'
-      ? this.settings.tier1DailyLimit
-      : user.tier === 'Tier 2'
-      ? this.settings.tier2DailyLimit
-      : this.settings.tier3DailyLimit;
+    const dailyLimit =
+      user.tier === 'Tier 1'
+        ? this.settings.tier1DailyLimit
+        : user.tier === 'Tier 2'
+        ? this.settings.tier2DailyLimit
+        : this.settings.tier3DailyLimit;
 
-    if (params.amount > dailyLimit) {
-      return { error: `Transfer amount exceeds your ${user.tier} daily limit of $${dailyLimit.toLocaleString('en-US', { minimumFractionDigits: 2 })}. Consider upgrading your tier in Account Settings.` };
+    if (amount > dailyLimit) {
+      return {
+        error: `Transfer amount exceeds your ${user.tier} daily limit of $${dailyLimit.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+        })}.`,
+      };
     }
 
-    // SWIFT 4-digit code verification check per Requirement 3
     if (this.settings.requireSwiftCode) {
       if (!user.swiftVerificationCode || params.verificationCode.trim() !== user.swiftVerificationCode) {
         return { error: 'Invalid credentials. Kindly request for your Swift Code.' };
       }
     }
 
+    const now = new Date().toISOString();
     const txId = `tx_tr_${Date.now()}`;
     const newTx: BankTransaction = {
       id: txId,
       userId: user.uid,
       accountNumber: user.accountNumber,
       type: 'transfer',
-      amount: params.amount,
+      amount,
       currency: user.currency || 'USD',
-      status: 'Pending', // Initially Pending; amount NOT deducted yet per Requirement 9!
+      status: 'Pending',
       senderName: `${user.fullName} ${user.surname}`,
       senderAccountNumber: user.accountNumber,
       recipientName: params.recipientName.trim(),
@@ -1391,319 +2096,750 @@ class AegisStore {
       recipientCountry: params.recipientCountry,
       swiftCode: params.swiftCode.trim().toUpperCase(),
       reference: `AEG-TX-${Math.floor(100000 + Math.random() * 900000)}`,
-      description: params.description?.trim() || `International Transfer to ${params.recipientName} (${params.recipientBank})`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      fee: 25.00
+      description:
+        params.description?.trim() ||
+        `International Transfer to ${params.recipientName} (${params.recipientBank})`,
+      createdAt: now,
+      updatedAt: now,
+      fee: 0,
     };
 
     const notif: BankNotification = {
       id: `notif_${Date.now()}`,
       userId: user.uid,
       title: 'Transfer Submitted (Pending Review)',
-      message: `Your transfer of $${params.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} to ${params.recipientName} at ${params.recipientBank} has been submitted and is awaiting administrator processing.`,
+      message: `Your transfer of $${amount.toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+      })} to ${params.recipientName} has been submitted and is awaiting administrator clearance.`,
       type: 'transaction',
       read: false,
       relatedId: txId,
-      createdAt: new Date().toISOString()
+      createdAt: now,
     };
-
-    this.transactions.unshift(newTx);
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
 
     try {
       await setDoc(doc(db, 'transactions', txId), newTx);
       await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
+      return { transaction: newTx };
+    } catch (e: any) {
+      return { error: e?.message || 'Failed to submit transfer.' };
     }
-
-    return { transaction: newTx };
   }
 
-  // Administrator Action: Approve Transaction
-  // Requirement 9: "Once the administrator approves the transaction, the receipt should automatically change to Completed."
-  public async adminApproveTransaction(txId: string): Promise<{ success: boolean; error?: string }> {
-    const tx = this.transactions.find(t => t.id === txId);
-    if (!tx) return { success: false, error: 'Transaction record not found.' };
-
-    if (tx.status === 'Completed') {
-      return { success: false, error: 'Transaction has already been approved.' };
+  public async adminApproveTransaction(
+    txId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
     }
 
-    const user = this.users.find(u => u.uid === tx.userId);
+    // Check if linked to a withdrawal record
+    const linkedWd = this.withdrawals.find((w) => w.linkedTxId === txId);
+    if (linkedWd) {
+      return this.adminApproveWithdrawal(linkedWd.id, reason);
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const txRef = doc(db, 'transactions', txId);
+        const txSnap = await tx.get(txRef);
+        if (!txSnap.exists()) throw new Error('Transaction record not found.');
+
+        const txData = txSnap.data() as BankTransaction;
+        if (txData.status !== 'Pending') {
+          throw new Error(`Transaction is already ${txData.status}.`);
+        }
+
+        const userRef = doc(db, 'users', txData.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('Customer record not found.');
+
+        const userData = userSnap.data() as UserProfile;
+        const previousBalance = Number(userData.balance || 0);
+        const amount = roundMoney(Number(txData.amount));
+        let newBalance = previousBalance;
+
+        if (txData.type === 'transfer' || txData.type === 'withdrawal') {
+          if (previousBalance < amount) {
+            throw new Error(`Customer has insufficient balance ($${previousBalance.toFixed(2)}) for this debit.`);
+          }
+          newBalance = roundMoney(previousBalance - amount);
+        } else if (txData.type === 'deposit' || txData.type === 'crypto_payment') {
+          newBalance = roundMoney(previousBalance + amount);
+        }
+
+        tx.update(userRef, { balance: newBalance, updatedAt: now });
+        tx.update(txRef, {
+          status: 'Completed',
+          previousBalance,
+          balanceAfter: newBalance,
+          reason: reason || 'Approved by clearing desk',
+          updatedAt: now,
+        });
+
+        const notifId = `notif_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: userData.uid,
+          title: 'Transaction Approved & Completed',
+          message: `Your ${txData.type} of $${amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} (Ref: ${txData.reference}) has been approved and completed.`,
+          type: 'success',
+          read: false,
+          relatedId: txData.id,
+          createdAt: now,
+        });
+
+        return { txData, userData, amount, previousBalance, newBalance };
+      });
+
+      await this.addAuditLog({
+        action: 'TRANSACTION_APPROVED',
+        affectedUserId: result.userData.uid,
+        targetAccount: result.userData.accountNumber,
+        transactionId: txId,
+        previousStatus: 'Pending',
+        newStatus: 'Completed',
+        amount: result.amount,
+        reason: reason || 'Cleared by administration',
+        details: `Approved ${result.txData.type} ${result.txData.reference} ($${result.amount.toFixed(2)}). Balance: $${result.previousBalance.toFixed(2)} -> $${result.newBalance.toFixed(2)}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to approve transaction.' };
+    }
+  }
+
+  public async adminCancelTransaction(
+    txId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const linkedWd = this.withdrawals.find((w) => w.linkedTxId === txId);
+    if (linkedWd) {
+      return this.adminCancelWithdrawal(linkedWd.id, reason);
+    }
+
+    const now = new Date().toISOString();
+    const cancelReason = reason?.trim() || 'Administrative review cancellation.';
+
+    try {
+      const result = await runTransaction(db, async (tx) => {
+        const txRef = doc(db, 'transactions', txId);
+        const txSnap = await tx.get(txRef);
+        if (!txSnap.exists()) throw new Error('Transaction not found.');
+
+        const txData = txSnap.data() as BankTransaction;
+        if (txData.status === 'Reversed' || txData.status === 'Cancelled') {
+          throw new Error(`Transaction is already ${txData.status}.`);
+        }
+
+        const userRef = doc(db, 'users', txData.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('Customer record not found.');
+
+        const userData = userSnap.data() as UserProfile;
+        const previousBalance = Number(userData.balance || 0);
+        const amount = roundMoney(Number(txData.amount));
+        let restoredBalance = previousBalance;
+
+        if (txData.status === 'Completed' && (txData.type === 'transfer' || txData.type === 'withdrawal')) {
+          restoredBalance = roundMoney(previousBalance + amount);
+        } else if (txData.status === 'Completed' && txData.type === 'deposit') {
+          restoredBalance = Math.max(0, roundMoney(previousBalance - amount));
+        }
+
+        if (restoredBalance !== previousBalance) {
+          tx.update(userRef, { balance: restoredBalance, updatedAt: now });
+        }
+
+        tx.update(txRef, {
+          status: 'Reversed',
+          balanceAfter: restoredBalance,
+          reason: cancelReason,
+          updatedAt: now,
+        });
+
+        const notifId = `notif_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: userData.uid,
+          title: 'Transaction Cancelled & Reversed',
+          message: `Transaction ${txData.reference} for $${amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} has been reversed. Reason: ${cancelReason}. Available balance: $${restoredBalance.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })}.`,
+          type: 'warning',
+          read: false,
+          relatedId: txData.id,
+          createdAt: now,
+        });
+
+        return { txData, userData, amount, previousStatus: txData.status, previousBalance, restoredBalance };
+      });
+
+      await this.addAuditLog({
+        action: 'TRANSACTION_REVERSED',
+        affectedUserId: result.userData.uid,
+        targetAccount: result.userData.accountNumber,
+        transactionId: txId,
+        previousStatus: result.previousStatus,
+        newStatus: 'Reversed',
+        amount: result.amount,
+        reason: cancelReason,
+        details: `Reversed ${result.txData.reference} ($${result.amount.toFixed(2)}). Balance: $${result.previousBalance.toFixed(2)} -> $${result.restoredBalance.toFixed(2)}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to reverse transaction.' };
+    }
+  }
+
+  // ==================== INVESTMENTS (CUSTOMER + TIER 1 PLAN MANAGEMENT) ====================
+  public async createInvestmentPlan(
+    plan: Omit<InvestmentPlan, 'id' | 'createdBy' | 'createdAt' | 'updatedAt'>
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isTier1Admin()) {
+      return { success: false, error: 'Only Tier 1 Super Administrators can create investment plans.' };
+    }
+
+    const now = new Date().toISOString();
+    const actor = this.getActorMetadata();
+    const id = `plan_${Date.now()}`;
+    const newPlan: InvestmentPlan = {
+      ...plan,
+      id,
+      createdBy: actor.adminEmail,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      await setDoc(doc(db, 'investment_plans', id), newPlan);
+      await this.addAuditLog({
+        action: 'INVESTMENT_PLAN_CREATED',
+        transactionId: id,
+        newStatus: plan.active ? 'Active' : 'Inactive',
+        reason: `Created plan ${plan.name} (${plan.roiPercent}% ROI / ${plan.durationDays}d)`,
+        details: `Tier 1 admin created investment plan "${plan.name}" ($${plan.minAmount}–$${plan.maxAmount}, ${plan.roiPercent}% ROI over ${plan.durationDays} days).`,
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to create investment plan.' };
+    }
+  }
+
+  public async updateInvestmentPlan(
+    planId: string,
+    updates: Partial<InvestmentPlan>
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isTier1Admin()) {
+      return { success: false, error: 'Only Tier 1 Super Administrators can modify investment plans.' };
+    }
+
+    const now = new Date().toISOString();
+    try {
+      await updateDoc(doc(db, 'investment_plans', planId), {
+        ...updates,
+        updatedAt: now,
+      });
+      await this.addAuditLog({
+        action: 'INVESTMENT_PLAN_UPDATED',
+        transactionId: planId,
+        reason: `Updated plan settings`,
+        details: `Tier 1 admin updated investment plan #${planId}.`,
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update investment plan.' };
+    }
+  }
+
+  public async subscribeToInvestmentPlan(
+    userId: string,
+    planId: string,
+    amountInput: number
+  ): Promise<{ investment?: UserInvestment; error?: string }> {
+    const amount = roundMoney(amountInput);
+    if (amount <= 0 || isNaN(amount)) {
+      return { error: 'Enter a valid investment amount.' };
+    }
+
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const invId = `inv_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+    const txId = `tx_inv_${Date.now()}`;
+
+    try {
+      const res = await runTransaction(db, async (tx) => {
+        const [planSnap, userSnap] = await Promise.all([
+          tx.get(doc(db, 'investment_plans', planId)),
+          tx.get(doc(db, 'users', userId)),
+        ]);
+
+        if (!planSnap.exists()) throw new Error('Investment plan not found.');
+        if (!userSnap.exists()) throw new Error('Customer account not found.');
+
+        const plan = planSnap.data() as InvestmentPlan;
+        const user = userSnap.data() as UserProfile;
+
+        if (!plan.active) throw new Error('This investment plan is currently inactive.');
+        if (user.status === 'suspended') throw new Error('Account suspended.');
+        if (amount < plan.minAmount || amount > plan.maxAmount) {
+          throw new Error(
+            `Investment amount must be between $${plan.minAmount.toLocaleString()} and $${plan.maxAmount.toLocaleString()}.`
+          );
+        }
+
+        const prevBal = Number(user.balance || 0);
+        if (prevBal < amount) {
+          throw new Error(`Insufficient balance ($${prevBal.toFixed(2)}) for this allocation.`);
+        }
+
+        const newBal = roundMoney(prevBal - amount);
+        const expectedReturn = roundMoney(amount + amount * (plan.roiPercent / 100));
+        const maturityDate = new Date(
+          now.getTime() + plan.durationDays * 24 * 60 * 60 * 1000
+        ).toISOString();
+
+        const inv: UserInvestment = {
+          id: invId,
+          userId: user.uid,
+          accountNumber: user.accountNumber,
+          userEmail: user.email,
+          userName: `${user.fullName} ${user.surname}`,
+          planId: plan.id,
+          planName: plan.name,
+          amount,
+          roiPercent: plan.roiPercent,
+          expectedReturn,
+          durationDays: plan.durationDays,
+          status: 'Active',
+          startDate: nowIso,
+          maturityDate,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+
+        const txDoc: BankTransaction = {
+          id: txId,
+          userId: user.uid,
+          accountNumber: user.accountNumber,
+          type: 'investment',
+          amount,
+          currency: user.currency || 'USD',
+          status: 'Completed',
+          senderName: `${user.fullName} ${user.surname}`,
+          recipientName: `${plan.name} Vault`,
+          reference: `AEG-INV-${Math.floor(100000 + Math.random() * 900000)}`,
+          description: `Investment subscription: ${plan.name} (${plan.roiPercent}% ROI)`,
+          previousBalance: prevBal,
+          balanceAfter: newBal,
+          linkedRecordId: invId,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+        };
+
+        const notifId = `notif_inv_${Date.now()}`;
+        tx.set(doc(db, 'investments', invId), inv);
+        tx.set(doc(db, 'transactions', txId), txDoc);
+        tx.update(doc(db, 'users', user.uid), {
+          balance: newBal,
+          lastBalanceLockId: invId,
+          lastBalanceLockType: 'investment',
+          updatedAt: nowIso,
+        });
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: user.uid,
+          title: `Investment Active: ${plan.name}`,
+          message: `Allocated $${amount.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })} to ${plan.name}. Projected maturity payout: $${expectedReturn.toLocaleString('en-US', {
+            minimumFractionDigits: 2,
+          })}.`,
+          type: 'success',
+          read: false,
+          relatedId: invId,
+          createdAt: nowIso,
+        });
+
+        return inv;
+      });
+
+      return { investment: res };
+    } catch (err: any) {
+      return { error: err?.message || 'Failed to subscribe to investment plan.' };
+    }
+  }
+
+  public async adminSettleInvestment(
+    investmentId: string,
+    action: 'Complete' | 'Cancel',
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const res = await runTransaction(db, async (tx) => {
+        const invRef = doc(db, 'investments', investmentId);
+        const invSnap = await tx.get(invRef);
+        if (!invSnap.exists()) throw new Error('Investment record not found.');
+
+        const inv = invSnap.data() as UserInvestment;
+        if (inv.status !== 'Active') {
+          throw new Error(`Investment is already ${inv.status}.`);
+        }
+
+        const userRef = doc(db, 'users', inv.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('User not found.');
+
+        const user = userSnap.data() as UserProfile;
+        const prevBal = Number(user.balance || 0);
+        const payout = action === 'Complete' ? roundMoney(inv.expectedReturn) : roundMoney(inv.amount);
+        const newBal = roundMoney(prevBal + payout);
+        const newStatus = action === 'Complete' ? 'Completed' : 'Cancelled';
+
+        const txId = `tx_inv_out_${Date.now()}`;
+        tx.update(userRef, { balance: newBal, updatedAt: now });
+        tx.update(invRef, { status: newStatus, settledAt: now, updatedAt: now });
+        tx.set(doc(db, 'transactions', txId), {
+          id: txId,
+          userId: user.uid,
+          accountNumber: user.accountNumber,
+          type: 'investment_payout',
+          amount: payout,
+          currency: user.currency || 'USD',
+          status: 'Completed',
+          senderName: `${inv.planName} Treasury`,
+          recipientName: `${user.fullName} ${user.surname}`,
+          reference: `AEG-ROI-${Math.floor(100000 + Math.random() * 900000)}`,
+          description:
+            action === 'Complete'
+              ? `Investment matured payout: ${inv.planName}`
+              : `Investment principal refunded: ${inv.planName}`,
+          previousBalance: prevBal,
+          balanceAfter: newBal,
+          linkedRecordId: inv.id,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        const notifId = `notif_inv_set_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: user.uid,
+          title:
+            action === 'Complete'
+              ? `Investment Matured: +$${payout.toLocaleString()}`
+              : 'Investment Cancelled & Principal Returned',
+          message:
+            action === 'Complete'
+              ? `Your ${inv.planName} position has matured and $${payout.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                })} has been credited to your balance.`
+              : `Your ${inv.planName} position was cancelled and $${payout.toLocaleString('en-US', {
+                  minimumFractionDigits: 2,
+                })} was refunded to your balance.`,
+          type: 'success',
+          read: false,
+          relatedId: inv.id,
+          createdAt: now,
+        });
+
+        return { inv, user, payout, newStatus };
+      });
+
+      await this.addAuditLog({
+        action: 'INVESTMENT_SETTLED',
+        affectedUserId: res.user.uid,
+        targetAccount: res.user.accountNumber,
+        transactionId: investmentId,
+        previousStatus: 'Active',
+        newStatus: res.newStatus,
+        amount: res.payout,
+        reason: reason || `Investment ${res.newStatus}`,
+        details: `Settled investment #${investmentId} (${res.inv.planName}) as ${res.newStatus} with $${res.payout.toFixed(2)} credited.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to settle investment.' };
+    }
+  }
+
+  // ==================== REFERRAL CREDITING ====================
+  public async adminCreditReferral(
+    referralId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const res = await runTransaction(db, async (tx) => {
+        const refRef = doc(db, 'referrals', referralId);
+        const refSnap = await tx.get(refRef);
+        if (!refSnap.exists()) throw new Error('Referral record not found.');
+
+        const ref = refSnap.data() as ReferralRecord;
+        if (ref.status !== 'Pending') {
+          throw new Error(`Referral bonus is already ${ref.status}.`);
+        }
+
+        const userRef = doc(db, 'users', ref.referrerUid);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('Referrer profile not found.');
+
+        const referrer = userSnap.data() as UserProfile;
+        const reward = roundMoney(Number(ref.rewardAmount || 100));
+        const prevBal = Number(referrer.balance || 0);
+        const newBal = roundMoney(prevBal + reward);
+
+        tx.update(userRef, { balance: newBal, updatedAt: now });
+        tx.update(refRef, { status: 'Credited', updatedAt: now });
+
+        const txId = `tx_ref_${Date.now()}`;
+        tx.set(doc(db, 'transactions', txId), {
+          id: txId,
+          userId: referrer.uid,
+          accountNumber: referrer.accountNumber,
+          type: 'referral_bonus',
+          amount: reward,
+          currency: referrer.currency || 'USD',
+          status: 'Completed',
+          senderName: 'Aegis Referral Program',
+          recipientName: `${referrer.fullName} ${referrer.surname}`,
+          reference: `AEG-REF-${Math.floor(100000 + Math.random() * 900000)}`,
+          description: `Referral reward for inviting ${ref.referredName}`,
+          previousBalance: prevBal,
+          balanceAfter: newBal,
+          linkedRecordId: ref.id,
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        const notifId = `notif_ref_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: referrer.uid,
+          title: `Referral Bonus Credited: +$${reward.toFixed(2)}`,
+          message: `You earned a $${reward.toFixed(2)} referral bonus for inviting ${ref.referredName}.`,
+          type: 'success',
+          read: false,
+          relatedId: ref.id,
+          createdAt: now,
+        });
+
+        return { ref, referrer, reward };
+      });
+
+      await this.addAuditLog({
+        action: 'REFERRAL_REWARD_CREDITED',
+        affectedUserId: res.referrer.uid,
+        targetAccount: res.referrer.accountNumber,
+        transactionId: referralId,
+        previousStatus: 'Pending',
+        newStatus: 'Credited',
+        amount: res.reward,
+        reason: reason || 'Referral bonus approved',
+        details: `Credited $${res.reward.toFixed(2)} referral bonus to ${res.referrer.accountNumber}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to credit referral.' };
+    }
+  }
+
+  // ==================== TWO-TIER ADMIN MANAGEMENT (TIER 1 ONLY) ====================
+  public async createTier2Admin(params: {
+    targetAccountOrEmail: string;
+    reason?: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    if (!this.isTier1Admin()) {
+      return {
+        success: false,
+        error: 'Access Denied: Only Tier 1 Super Administrators can appoint Tier 2 Administrators.',
+      };
+    }
+
+    const q = params.targetAccountOrEmail.trim().toLowerCase();
+    const targetUser = this.users.find(
+      (u) => u.email.toLowerCase() === q || u.accountNumber === q
+    );
+
+    if (!targetUser) {
+      return {
+        success: false,
+        error: 'Customer account not found. The target user must first register an account.',
+      };
+    }
+
+    if (PRIMARY_SUPER_ADMIN_EMAILS.includes(targetUser.email.toLowerCase())) {
+      return { success: false, error: 'Cannot downgrade a Primary Tier 1 Super Administrator.' };
+    }
+
+    const now = new Date().toISOString();
+    const actor = this.getActorMetadata();
+    const adminRec: AdminRoleRecord = {
+      uid: targetUser.uid,
+      email: targetUser.email,
+      username: targetUser.username || targetUser.email.split('@')[0],
+      fullName: `${targetUser.fullName} ${targetUser.surname}`,
+      tier: 'tier2',
+      status: 'active',
+      createdBy: actor.adminEmail,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      await setDoc(doc(db, 'admins', targetUser.uid), adminRec);
+      await updateDoc(doc(db, 'users', targetUser.uid), {
+        role: 'admin',
+        adminTier: 'tier2',
+        updatedAt: now,
+      });
+
+      await this.addAuditLog({
+        action: 'ADMIN_TIER2_CREATED',
+        affectedUserId: targetUser.uid,
+        targetAccount: targetUser.accountNumber,
+        previousStatus: targetUser.adminTier || 'user',
+        newStatus: 'tier2',
+        reason: params.reason || 'Appointed Tier 2 Operations Administrator',
+        details: `Tier 1 Super Admin granted Tier 2 Operations Administrator privileges to ${targetUser.email}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to create Tier 2 administrator.' };
+    }
+  }
+
+  public async updateAdminStatus(
+    adminUid: string,
+    status: 'active' | 'revoked',
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isTier1Admin()) {
+      return {
+        success: false,
+        error: 'Access Denied: Only Tier 1 Super Administrators can modify administrator permissions.',
+      };
+    }
+
+    const targetAdmin = this.admins.find((a) => a.uid === adminUid);
+    if (!targetAdmin) return { success: false, error: 'Administrator record not found.' };
+
+    if (
+      targetAdmin.tier === 'tier1' ||
+      PRIMARY_SUPER_ADMIN_EMAILS.includes(targetAdmin.email.toLowerCase())
+    ) {
+      return { success: false, error: 'Tier 1 Super Administrator privileges cannot be modified or revoked here.' };
+    }
+
+    const now = new Date().toISOString();
+    try {
+      await updateDoc(doc(db, 'admins', adminUid), { status, updatedAt: now });
+      await updateDoc(doc(db, 'users', adminUid), {
+        role: status === 'active' ? 'admin' : 'user',
+        adminTier: status === 'active' ? 'tier2' : null,
+        updatedAt: now,
+      }).catch(() => {});
+
+      await this.addAuditLog({
+        action: 'ADMIN_ACCESS_REVOKED',
+        affectedUserId: adminUid,
+        previousStatus: targetAdmin.status,
+        newStatus: status,
+        reason: reason || `Tier 2 admin status changed to ${status}`,
+        details: `Tier 1 admin changed ${targetAdmin.email} (Tier 2) status from ${targetAdmin.status} to ${status}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update admin status.' };
+    }
+  }
+
+  // ==================== ACCOUNT SUSPENSION & TIER VERIFICATION ====================
+  public async adminToggleUserSuspension(
+    accountNumber: string,
+    reason?: string
+  ): Promise<{ success: boolean; user?: UserProfile; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+    const user = this.getUserByAccountNumber(accountNumber);
+    if (!user) return { success: false, error: `Customer account ${accountNumber} not found.` };
+
+    const prevStatus = user.status;
+    const newStatus = prevStatus === 'suspended' ? 'active' : 'suspended';
+    const now = new Date().toISOString();
+    const actionReason =
+      reason?.trim() ||
+      (newStatus === 'suspended'
+        ? 'Administrative compliance restriction'
+        : 'Administrative security clearance restored');
+
+    try {
+      await updateDoc(doc(db, 'users', user.uid), { status: newStatus, updatedAt: now });
+      await setDoc(doc(db, 'notifications', `notif_status_${Date.now()}`), {
+        id: `notif_status_${Date.now()}`,
+        userId: user.uid,
+        title: newStatus === 'suspended' ? 'Account Security Suspension' : 'Account Reactivated',
+        message:
+          newStatus === 'suspended'
+            ? actionReason
+            : 'Your account restrictions have been cleared. Full transaction access is restored.',
+        type: newStatus === 'suspended' ? 'security' : 'success',
+        read: false,
+        createdAt: now,
+      });
+
+      await this.addAuditLog({
+        action: newStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_REACTIVATED',
+        affectedUserId: user.uid,
+        targetAccount: user.accountNumber,
+        previousStatus: prevStatus,
+        newStatus,
+        reason: actionReason,
+        details: `Account ${user.accountNumber} (${user.email}) status changed from ${prevStatus} to ${newStatus}.`,
+      });
+
+      return { success: true, user: { ...user, status: newStatus, updatedAt: now } };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update account status.' };
+    }
+  }
+
+  public async toggleUserSuspension(
+    userId: string,
+    newStatus: 'active' | 'suspended'
+  ): Promise<{ success: boolean; error?: string }> {
+    const user = this.getUserById(userId);
     if (!user) return { success: false, error: 'User not found.' };
-
-    // Now deduct balance upon approval
-    if (tx.type === 'transfer' || tx.type === 'withdrawal') {
-      if (user.balance < tx.amount) {
-        return { success: false, error: `Customer has insufficient balance ($${user.balance}) to process this $${tx.amount} debit.` };
-      }
-      user.balance = Math.round((user.balance - tx.amount) * 100) / 100;
-    } else if (tx.type === 'deposit') {
-      user.balance = Math.round((user.balance + tx.amount) * 100) / 100;
-    }
-
-    tx.status = 'Completed';
-    tx.updatedAt = new Date().toISOString();
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: 'Transaction Approved & Completed',
-      message: `Your ${tx.type} of $${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} (Ref: ${tx.reference}) has been approved and completed following Aegis Review.`,
-      type: 'success',
-      read: false,
-      relatedId: tx.id,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { balance: user.balance, updatedAt: user.updatedAt });
-      await updateDoc(doc(db, 'transactions', tx.id), { status: 'Completed', updatedAt: tx.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning in adminApproveTransaction:', e);
-    }
-
-    return { success: true };
+    if (user.status === newStatus) return { success: true };
+    return this.adminToggleUserSuspension(user.accountNumber);
   }
 
-  // Administrator Action: Cancel / Reverse Transaction
-  // Requirement 9: "If the administrator cancels the transaction, the receipt should show Reversed, and any amount previously deducted should automatically be returned to the user’s account balance. The system must return the exact amount involved in the cancelled transaction without adding or deducting any additional amount."
-  public async adminCancelTransaction(txId: string, reason?: string): Promise<{ success: boolean; error?: string }> {
-    const tx = this.transactions.find(t => t.id === txId);
-    if (!tx) return { success: false, error: 'Transaction not found.' };
-
-    const user = this.users.find(u => u.uid === tx.userId);
-    if (!user) return { success: false, error: 'User not found.' };
-
-    // If previously completed, restore exact balance
-    if (tx.status === 'Completed' && (tx.type === 'transfer' || tx.type === 'withdrawal')) {
-      user.balance = Math.round((user.balance + tx.amount) * 100) / 100;
-    } else if (tx.status === 'Completed' && tx.type === 'deposit') {
-      user.balance = Math.max(0, Math.round((user.balance - tx.amount) * 100) / 100);
-    }
-
-    tx.status = 'Reversed';
-    tx.updatedAt = new Date().toISOString();
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: 'Transaction Cancelled & Reversed',
-      message: `Transaction ${tx.reference} for $${tx.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} has been reversed. ${reason ? `Reason: ${reason}. ` : ''}Your account balance reflects the exact restored amount of $${user.balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}.`,
-      type: 'warning',
-      read: false,
-      relatedId: tx.id,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), { balance: user.balance, updatedAt: user.updatedAt });
-      await updateDoc(doc(db, 'transactions', tx.id), { status: 'Reversed', updatedAt: tx.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true };
-  }
-
-  // Payment Submission: "I Have Made the Payment"
-  // Requirement 6: "When a user makes a payment, the website should provide an option labelled 'I Have Made the Payment.' After clicking this option, the user should be able to submit proof of payment. The payment submission should appear in the admin dashboard as Pending."
-  public async submitPaymentProof(params: {
-    userId: string;
-    method: 'BTC' | 'USDT_ERC20' | 'Bank_Wire';
-    amount: number;
-    txHashOrRef: string;
-    proofImageUrl?: string;
-    notes?: string;
-  }): Promise<{ submission?: PaymentSubmission; error?: string }> {
-    const user = this.users.find(u => u.uid === params.userId);
-    if (!user) return { error: 'User profile not found.' };
-
-    if (params.amount <= 0 || isNaN(params.amount)) {
-      return { error: 'Please enter a valid payment amount.' };
-    }
-
-    const subId = `pay_sub_${Date.now()}`;
-    const walletAddress = params.method === 'BTC'
-      ? this.settings.btcAddress
-      : params.method === 'USDT_ERC20'
-      ? this.settings.usdtAddress
-      : 'GB82 BARC 2000 0084 9201 84';
-
-    const newSub: PaymentSubmission = {
-      id: subId,
-      userId: user.uid,
-      accountNumber: user.accountNumber,
-      userFullName: `${user.fullName} ${user.surname}`,
-      userEmail: user.email,
-      method: params.method,
-      amount: params.amount,
-      currency: 'USD',
-      txHashOrRef: params.txHashOrRef.trim() || `HASH-${Date.now().toString(16)}`,
-      walletAddress,
-      proofImageUrl: params.proofImageUrl || '',
-      notes: params.notes?.trim() || '',
-      status: 'Pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: 'Payment Proof Submitted',
-      message: `Your payment proof of $${params.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} via ${params.method.replace('_', ' ')} has been submitted. Status: Pending Aegis Review.`,
-      type: 'info',
-      read: false,
-      relatedId: subId,
-      createdAt: new Date().toISOString()
-    };
-
-    this.paymentSubmissions.unshift(newSub);
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.PAYMENT_SUBMISSIONS, this.paymentSubmissions);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await setDoc(doc(db, 'payment_submissions', subId), newSub);
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { submission: newSub };
-  }
-
-  // Administrator Action: Approve Payment Submission
-  // Requirement 6: "If the administrator approves the payment, the system should automatically notify the user."
-  public async adminApprovePaymentSubmission(subId: string): Promise<{ success: boolean; error?: string }> {
-    const sub = this.paymentSubmissions.find(s => s.id === subId);
-    if (!sub) return { success: false, error: 'Payment submission not found.' };
-
-    const user = this.users.find(u => u.uid === sub.userId);
-    if (!user) return { success: false, error: 'User not found.' };
-
-    sub.status = 'Approved';
-    sub.updatedAt = new Date().toISOString();
-
-    // Credit user's balance
-    user.balance = Math.round((user.balance + sub.amount) * 100) / 100;
-    user.updatedAt = new Date().toISOString();
-
-    // Create completed deposit transaction
-    const txId = `tx_pay_${Date.now()}`;
-    const tx: BankTransaction = {
-      id: txId,
-      userId: user.uid,
-      accountNumber: user.accountNumber,
-      type: 'crypto_payment',
-      amount: sub.amount,
-      currency: 'USD',
-      status: 'Completed',
-      senderName: `${sub.method.replace('_', ' ')} Network Deposit`,
-      recipientName: `${user.fullName} ${user.surname}`,
-      reference: `AGS-PAY-${sub.txHashOrRef.slice(0, 8).toUpperCase()}`,
-      description: `Approved Payment Proof: ${sub.notes || sub.method}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: 'Payment Approved & Credited!',
-      message: `Your payment of $${sub.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} via ${sub.method.replace('_', ' ')} has been approved following Aegis Review and credited to your available balance.`,
-      type: 'success',
-      read: false,
-      relatedId: sub.id,
-      createdAt: new Date().toISOString()
-    };
-
-    this.transactions.unshift(tx);
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.PAYMENT_SUBMISSIONS, this.paymentSubmissions);
-    setLocal(CACHE_KEYS.TRANSACTIONS, this.transactions);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'payment_submissions', sub.id), { status: 'Approved', updatedAt: sub.updatedAt });
-      await updateDoc(doc(db, 'users', user.uid), { balance: user.balance, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'transactions', tx.id), tx);
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true };
-  }
-
-  // Administrator Action: Cancel Payment Submission
-  // Requirement 6: "If the administrator cancels the payment, the user’s account should retain its previous status, and the payment request should show as Cancelled."
-  public async adminCancelPaymentSubmission(subId: string): Promise<{ success: boolean; error?: string }> {
-    const sub = this.paymentSubmissions.find(s => s.id === subId);
-    if (!sub) return { success: false, error: 'Payment submission not found.' };
-
-    sub.status = 'Cancelled';
-    sub.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: sub.userId,
-      title: 'Payment Submission Cancelled',
-      message: `Your payment submission for $${sub.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })} (${sub.method}) was reviewed and marked as Cancelled. Your account balance remains unchanged.`,
-      type: 'warning',
-      read: false,
-      relatedId: sub.id,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.PAYMENT_SUBMISSIONS, this.paymentSubmissions);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'payment_submissions', sub.id), { status: 'Cancelled', updatedAt: sub.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true };
-  }
-
-  // Account Verification & Tier Upgrade Requests
-  // Requirement 7: Tier 2 requires facial verification ($500 initial fee). Tier 3 requires Gov ID ($5,000 fee).
   public async submitTierUpgrade(params: {
     userId: string;
     targetTier: 'Tier 2' | 'Tier 3';
@@ -1713,12 +2849,16 @@ class AegisStore {
     documentNumber?: string;
     notes?: string;
   }): Promise<{ request?: VerificationRequest; error?: string }> {
-    const user = this.users.find(u => u.uid === params.userId);
+    const user = this.getUserById(params.userId);
     if (!user) return { error: 'User profile not found.' };
 
-    const fee = params.targetTier === 'Tier 2' ? this.settings.tier2UpgradeFee : this.settings.tier3UpgradeFee;
-
+    const fee =
+      params.targetTier === 'Tier 2'
+        ? this.settings.tier2UpgradeFee
+        : this.settings.tier3UpgradeFee;
+    const now = new Date().toISOString();
     const reqId = `verif_${Date.now()}`;
+
     const newReq: VerificationRequest = {
       id: reqId,
       userId: user.uid,
@@ -1726,179 +2866,224 @@ class AegisStore {
       fullName: `${user.fullName} ${user.surname}`,
       targetTier: params.targetTier,
       verificationType: params.verificationType,
-      documentType: params.documentType || (params.verificationType === 'facial' ? 'Biometric Facial Photo' : 'Passport / Gov ID'),
-      documentNumber: params.documentNumber || `ID-${Math.floor(1000000 + Math.random() * 9000000)}`,
+      documentType:
+        params.documentType ||
+        (params.verificationType === 'facial' ? 'Biometric Facial Photo' : 'Passport / Gov ID'),
+      documentNumber:
+        params.documentNumber || `ID-${Math.floor(1000000 + Math.random() * 9000000)}`,
       mediaUrl: params.mediaUrl,
       feePaid: fee,
       status: 'Pending Review',
       notes: params.notes || '',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: now,
+      updatedAt: now,
     };
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: `${params.targetTier} Verification Submitted`,
-      message: `Your ${params.targetTier} upgrade verification documents have been received. Current Status: Pending Review by Compliance Officer.`,
-      type: 'verification',
-      read: false,
-      relatedId: reqId,
-      createdAt: new Date().toISOString()
-    };
-
-    this.verificationRequests.unshift(newReq);
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.VERIFICATION_REQUESTS, this.verificationRequests);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
 
     try {
       await setDoc(doc(db, 'verification_requests', reqId), newReq);
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
+      await setDoc(doc(db, 'notifications', `notif_${Date.now()}`), {
+        id: `notif_${Date.now()}`,
+        userId: user.uid,
+        title: `${params.targetTier} Verification Submitted`,
+        message: `Your ${params.targetTier} verification submission is Pending Review by compliance.`,
+        type: 'verification',
+        read: false,
+        relatedId: reqId,
+        createdAt: now,
+      });
+      return { request: newReq };
+    } catch (e: any) {
+      return { error: e?.message || 'Verification submission failed.' };
     }
-
-    return { request: newReq };
   }
 
-  // Administrator Action: Approve Tier Upgrade
-  // Requirement 7: "Once approved, the account should automatically upgrade to Tier 2 / Tier 3."
-  public async adminApproveTierUpgrade(requestId: string): Promise<{ success: boolean; error?: string }> {
-    const req = this.verificationRequests.find(r => r.id === requestId);
+  public async adminApproveTierUpgrade(
+    requestId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const now = new Date().toISOString();
+    try {
+      const res = await runTransaction(db, async (tx) => {
+        const reqRef = doc(db, 'verification_requests', requestId);
+        const reqSnap = await tx.get(reqRef);
+        if (!reqSnap.exists()) throw new Error('Verification request not found.');
+
+        const req = reqSnap.data() as VerificationRequest;
+        if (req.status !== 'Pending Review') {
+          throw new Error(`Verification request is already ${req.status}.`);
+        }
+
+        const userRef = doc(db, 'users', req.userId);
+        const userSnap = await tx.get(userRef);
+        if (!userSnap.exists()) throw new Error('User not found.');
+        const user = userSnap.data() as UserProfile;
+
+        tx.update(reqRef, { status: 'Approved', updatedAt: now });
+        tx.update(userRef, { tier: req.targetTier, updatedAt: now });
+        const notifId = `notif_${Date.now()}`;
+        tx.set(doc(db, 'notifications', notifId), {
+          id: notifId,
+          userId: user.uid,
+          title: `Account Upgraded to ${req.targetTier}`,
+          message: `Your identity verification has been approved and your account upgraded to ${req.targetTier}.`,
+          type: 'success',
+          read: false,
+          relatedId: req.id,
+          createdAt: now,
+        });
+
+        return { req, prevTier: user.tier };
+      });
+
+      await this.addAuditLog({
+        action: 'TIER_UPGRADE_APPROVED',
+        affectedUserId: res.req.userId,
+        targetAccount: res.req.accountNumber,
+        transactionId: requestId,
+        previousStatus: res.prevTier,
+        newStatus: res.req.targetTier,
+        reason: 'Biometric / KYC verification approved',
+        details: `Upgraded ${res.req.accountNumber} from ${res.prevTier} to ${res.req.targetTier}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to approve verification.' };
+    }
+  }
+
+  public async adminRejectTierUpgrade(
+    requestId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+
+    const req = this.verificationRequests.find((r) => r.id === requestId);
     if (!req) return { success: false, error: 'Verification request not found.' };
 
-    const user = this.users.find(u => u.uid === req.userId);
-    if (!user) return { success: false, error: 'User not found.' };
-
-    req.status = 'Approved';
-    req.updatedAt = new Date().toISOString();
-
-    user.tier = req.targetTier;
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: `Account Upgraded to ${req.targetTier}!`,
-      message: `Congratulations! Your identity verification has been approved. Your account is now ${req.targetTier}. Enjoy enhanced daily limits and exclusive private banking privileges.`,
-      type: 'success',
-      read: false,
-      relatedId: req.id,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.VERIFICATION_REQUESTS, this.verificationRequests);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
+    const now = new Date().toISOString();
+    const rejectReason = reason?.trim() || 'Document clarity verification failed.';
 
     try {
-      await updateDoc(doc(db, 'verification_requests', req.id), { status: 'Approved', updatedAt: req.updatedAt });
-      await updateDoc(doc(db, 'users', user.uid), { tier: user.tier, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
+      await updateDoc(doc(db, 'verification_requests', requestId), {
+        status: 'Rejected',
+        notes: rejectReason,
+        updatedAt: now,
+      });
+      await setDoc(doc(db, 'notifications', `notif_${Date.now()}`), {
+        id: `notif_${Date.now()}`,
+        userId: req.userId,
+        title: `${req.targetTier} Verification Rejected`,
+        message: `Your verification submission was declined. Reason: ${rejectReason}.`,
+        type: 'warning',
+        read: false,
+        relatedId: req.id,
+        createdAt: now,
+      });
 
-    return { success: true };
+      await this.addAuditLog({
+        action: 'TIER_UPGRADE_REJECTED',
+        affectedUserId: req.userId,
+        targetAccount: req.accountNumber,
+        transactionId: requestId,
+        previousStatus: req.status,
+        newStatus: 'Rejected',
+        reason: rejectReason,
+        details: `Rejected ${req.targetTier} KYC request for ${req.accountNumber}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to reject verification.' };
+    }
   }
 
-  // Administrator Action: Reject Tier Upgrade
-  public async adminRejectTierUpgrade(requestId: string, reason?: string): Promise<{ success: boolean; error?: string }> {
-    const req = this.verificationRequests.find(r => r.id === requestId);
-    if (!req) return { success: false, error: 'Verification request not found.' };
-
-    req.status = 'Rejected';
-    req.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: req.userId,
-      title: `${req.targetTier} Verification Rejected`,
-      message: `Your verification submission was reviewed and declined. ${reason ? `Reason: ${reason}. ` : ''}Please re-upload clear biometric proof.`,
-      type: 'warning',
-      read: false,
-      relatedId: req.id,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.VERIFICATION_REQUESTS, this.verificationRequests);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
-    try {
-      await updateDoc(doc(db, 'verification_requests', req.id), { status: 'Rejected', updatedAt: req.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
+  public async adminSetUserTier(
+    accountNumber: string,
+    tier: AccountTier
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
     }
-
-    return { success: true };
-  }
-
-  // Administrator Action: Directly change user tier
-  public async adminSetUserTier(accountNumber: string, tier: AccountTier): Promise<{ success: boolean; error?: string }> {
     const user = this.getUserByAccountNumber(accountNumber);
     if (!user) return { success: false, error: 'Account not found.' };
 
-    user.tier = tier;
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_${Date.now()}`,
-      userId: user.uid,
-      title: `Account Tier Updated to ${tier}`,
-      message: `Your account tier has been updated to ${tier} following Aegis Review.`,
-      type: 'info',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
-
+    const prevTier = user.tier;
+    const now = new Date().toISOString();
     try {
-      await updateDoc(doc(db, 'users', user.uid), { tier, updatedAt: user.updatedAt });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
+      await updateDoc(doc(db, 'users', user.uid), { tier, updatedAt: now });
+      await setDoc(doc(db, 'notifications', `notif_${Date.now()}`), {
+        id: `notif_${Date.now()}`,
+        userId: user.uid,
+        title: `Account Tier Updated to ${tier}`,
+        message: `Your account tier has been updated to ${tier}.`,
+        type: 'info',
+        read: false,
+        createdAt: now,
+      });
 
-    return { success: true };
+      await this.addAuditLog({
+        action: 'TIER_UPDATED',
+        affectedUserId: user.uid,
+        targetAccount: user.accountNumber,
+        previousStatus: prevTier,
+        newStatus: tier,
+        reason: 'Manual tier adjustment',
+        details: `Updated ${user.accountNumber} tier from ${prevTier} to ${tier}.`,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update tier.' };
+    }
   }
 
-  // Administrator Action: Update Financial Settings
-  // Requirement 10: "Whenever the administrator changes an amount or wallet address and clicks Save, the updated information should automatically appear in the relevant sections of the website."
-  public async updateFinancialSettings(updated: Partial<FinancialSettings>): Promise<{ success: boolean }> {
-    this.settings = {
+  // ==================== CRITICAL FINANCIAL SETTINGS (TIER 1 ONLY) ====================
+  public async updateFinancialSettings(
+    updated: Partial<FinancialSettings>
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isTier1Admin()) {
+      return {
+        success: false,
+        error: 'Access Denied: Only Tier 1 Super Administrators can alter critical financial and banking settings.',
+      };
+    }
+
+    const nextSettings: FinancialSettings = {
       ...this.settings,
       ...updated,
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
     };
 
-    setLocal(CACHE_KEYS.SETTINGS, this.settings);
-    this.notify();
-
     try {
-      await setDoc(doc(db, 'settings', 'financial'), this.settings);
-    } catch (e) {
-      console.warn('Firestore write warning in updateFinancialSettings:', e);
+      await setDoc(doc(db, 'settings', 'financial'), nextSettings, { merge: true });
+      await this.addAuditLog({
+        action: 'SETTINGS_UPDATED',
+        reason: 'Tier 1 updated global financial & banking parameters',
+        details: 'Global limits, fees, crypto wallets, and clearing bank coordinates updated.',
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to save financial settings.' };
     }
-
-    return { success: true };
   }
 
-  // Send Direct Notification
+  public async updateCryptoSettings(params: {
+    btcAddress: string;
+    usdtAddress: string;
+  }): Promise<{ success: boolean; error?: string }> {
+    return this.updateFinancialSettings({
+      btcAddress: params.btcAddress.trim(),
+      usdtAddress: params.usdtAddress.trim(),
+    });
+  }
+
+  // ==================== NOTIFICATIONS ====================
   public async sendDirectNotification(params: {
     accountNumber: string;
     title: string;
@@ -1915,201 +3100,176 @@ class AegisStore {
       message: params.message.trim(),
       type: params.type || 'info',
       read: false,
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
 
     try {
       await setDoc(doc(db, 'notifications', notif.id), notif);
+      if (this.isCurrentUserAdmin()) {
+        await this.addAuditLog({
+          action: 'NOTIFICATION_DISPATCHED',
+          affectedUserId: user.uid,
+          targetAccount: user.accountNumber,
+          reason: notif.title,
+          details: `Dispatched direct notification "${notif.title}" to ${user.accountNumber}.`,
+        });
+      }
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to dispatch notification.' };
+    }
+  }
+
+  public async markNotificationAsRead(notifId: string) {
+    try {
+      await updateDoc(doc(db, 'notifications', notifId), { read: true });
     } catch (e) {
-      console.warn('Firestore write warning:', e);
-    }
-
-    return { success: true };
-  }
-
-  // Mark notification as read
-  public markNotificationAsRead(notifId: string) {
-    const notif = this.notifications.find(n => n.id === notifId);
-    if (notif) {
-      notif.read = true;
-      setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-      this.notify();
+      console.warn('Mark notification read warning:', e);
     }
   }
 
-  // Clear all notifications for user
-  public clearUserNotifications(userId: string) {
-    this.notifications = this.notifications.filter(n => n.userId !== userId);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
-    this.notify();
+  public async clearUserNotifications(userId: string) {
+    const unread = this.notifications.filter((n) => n.userId === userId && !n.read);
+    await Promise.all(
+      unread.map((n) => updateDoc(doc(db, 'notifications', n.id), { read: true }).catch(() => {}))
+    );
   }
 
-  // ================= SWIFT CODE VERIFICATION REQUESTS ($2,500 FLOW) =================
-  public getSwiftRequests(): SwiftRequest[] {
-    return [...this.swiftRequests];
-  }
-
-  public submitSwiftRequest(params: {
+  // ==================== SWIFT REQUESTS ====================
+  public async submitSwiftRequest(params: {
     userId: string;
     paymentMethod: PaymentMethod;
     txHashOrRef: string;
     proofImageUrl?: string;
     adminNotes?: string;
-  }): SwiftRequest {
+  }): Promise<SwiftRequest> {
     const user = this.getUserById(params.userId);
     if (!user) throw new Error('User not found');
 
+    const now = new Date().toISOString();
     const req: SwiftRequest = {
       id: `sw_${Date.now()}`,
       userId: user.uid,
       accountNumber: user.accountNumber,
       fullName: `${user.fullName} ${user.surname}`,
       email: user.email,
-      amount: 2500.00,
+      amount: 2500.0,
       paymentMethod: params.paymentMethod,
       txHashOrRef: params.txHashOrRef,
-      proofImageUrl: params.proofImageUrl,
+      proofImageUrl: params.proofImageUrl || '',
       status: 'Pending',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      adminNotes: params.adminNotes
+      createdAt: now,
+      updatedAt: now,
+      adminNotes: params.adminNotes || '',
     };
 
-    this.swiftRequests.unshift(req);
-    setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
-
-    this.addAuditLog({
-      adminEmail: 'system',
-      action: 'SWIFT_CODE_REQUESTED' as any,
-      targetAccount: user.accountNumber,
-      details: `SWIFT 4-digit code clearance request submitted ($2,500 deposit fee via ${params.paymentMethod}). TxHash: ${params.txHashOrRef}`
-    });
-
-    try {
-      setDoc(doc(db, 'swift_requests', req.id), req);
-    } catch (e) {
-      console.warn('Firestore swift request write warning:', e);
-    }
-
-    this.notify();
+    await setDoc(doc(db, 'swift_requests', req.id), req);
     return req;
   }
 
-  public async approveSwiftRequest(requestId: string): Promise<{ success: boolean; code?: string; error?: string }> {
-    const req = this.swiftRequests.find(r => r.id === requestId);
+  public async approveSwiftRequest(
+    requestId: string
+  ): Promise<{ success: boolean; code?: string; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+    const req = this.swiftRequests.find((r) => r.id === requestId);
     if (!req) return { success: false, error: 'Request not found' };
 
-    const user = this.getUserById(req.userId);
-    if (!user) return { success: false, error: 'Associated customer account not found' };
-
-    // Generate valid 4-digit transfer code
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
-    user.swiftVerificationCode = code;
-    user.swiftVerified = true;
-    user.updatedAt = new Date().toISOString();
-
-    // Requirement: The $2,500 deposit is NOT credited to the user's balance!
-    req.status = 'Approved';
-    req.assignedCode = code;
-    req.updatedAt = new Date().toISOString();
-
-    // Dispatch automated in-app notification containing the valid 4-digit transfer code
-    const notif: BankNotification = {
-      id: `notif_swift_${Date.now()}`,
-      userId: user.uid,
-      title: 'SWIFT 4-Digit Transfer Code Approved',
-      message: `Your SWIFT clearance deposit of $2,500 has been verified and approved by administration. Your authorized 4-digit transfer authorization code is: ${code}. You can now execute domestic and international wire transfers.`,
-      type: 'verification',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
+    const code = generate4DigitCode();
+    const now = new Date().toISOString();
 
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
+      await updateDoc(doc(db, 'users', req.userId), {
         swiftVerificationCode: code,
         swiftVerified: true,
-        updatedAt: user.updatedAt
+        updatedAt: now,
       });
       await updateDoc(doc(db, 'swift_requests', req.id), {
         status: 'Approved',
         assignedCode: code,
-        updatedAt: req.updatedAt
+        updatedAt: now,
       });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore approve swift update offline:', e);
+      await setDoc(doc(db, 'notifications', `notif_swift_${Date.now()}`), {
+        id: `notif_swift_${Date.now()}`,
+        userId: req.userId,
+        title: 'SWIFT Authorization Code Issued',
+        message: `Your 4-digit transfer authorization code is ${code}.`,
+        type: 'verification',
+        read: false,
+        createdAt: now,
+      });
+
+      await this.addAuditLog({
+        action: 'SWIFT_CODE_APPROVED',
+        affectedUserId: req.userId,
+        targetAccount: req.accountNumber,
+        transactionId: requestId,
+        previousStatus: req.status,
+        newStatus: 'Approved',
+        reason: 'SWIFT clearance approved',
+        details: `Issued 4-digit SWIFT authorization code to ${req.accountNumber}.`,
+      });
+      return { success: true, code };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to approve SWIFT request.' };
     }
-
-    this.addAuditLog({
-      adminEmail: 'newzelebarclaysupport@gmail.com',
-      action: 'SWIFT_CODE_APPROVED',
-      targetAccount: user.accountNumber,
-      details: `SWIFT authorization code ${code} issued to ${user.fullName} ${user.surname} upon $2,500 clearance approval.`
-    });
-
-    this.notify();
-    return { success: true, code };
   }
 
-  public async rejectSwiftRequest(requestId: string, reason?: string): Promise<{ success: boolean; error?: string }> {
-    const req = this.swiftRequests.find(r => r.id === requestId);
+  public async rejectSwiftRequest(
+    requestId: string,
+    reason?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    if (!this.isCurrentUserAdmin()) {
+      return { success: false, error: 'Administrator clearance required.' };
+    }
+    const req = this.swiftRequests.find((r) => r.id === requestId);
     if (!req) return { success: false, error: 'Request not found' };
 
-    req.status = 'Rejected';
-    req.adminNotes = reason || 'Payment proof verification unconfirmed.';
-    req.updatedAt = new Date().toISOString();
-
-    // Requirement: "Canceled/Rejected: No notification or code is sent to the user."
-    setLocal(CACHE_KEYS.SWIFT_REQUESTS, this.swiftRequests);
-
+    const now = new Date().toISOString();
+    const rejectReason = reason || 'Verification declined.';
     try {
       await updateDoc(doc(db, 'swift_requests', req.id), {
         status: 'Rejected',
-        adminNotes: req.adminNotes,
-        updatedAt: req.updatedAt
+        adminNotes: rejectReason,
+        updatedAt: now,
       });
-    } catch (e) {
-      console.warn('Firestore reject swift update offline:', e);
+      await this.addAuditLog({
+        action: 'SWIFT_CODE_REJECTED',
+        affectedUserId: req.userId,
+        targetAccount: req.accountNumber,
+        transactionId: requestId,
+        previousStatus: req.status,
+        newStatus: 'Rejected',
+        reason: rejectReason,
+        details: `Rejected SWIFT request for ${req.accountNumber}.`,
+      });
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to reject SWIFT request.' };
     }
-
-    this.addAuditLog({
-      adminEmail: 'newzelebarclaysupport@gmail.com',
-      action: 'SWIFT_CODE_REJECTED',
-      targetAccount: req.accountNumber,
-      details: `SWIFT clearance request rejected for account ${req.accountNumber}. Reason: ${req.adminNotes}`
-    });
-
-    this.notify();
-    return { success: true };
   }
 
-  // ================= ON-DEMAND VIRTUAL CARD ISSUANCE =================
-  public async issueVirtualCard(userId: string): Promise<{ success: boolean; card?: CardDetails; error?: string }> {
+  // ==================== VIRTUAL CARD MANAGEMENT ====================
+  public async issueVirtualCard(
+    userId: string
+  ): Promise<{ success: boolean; card?: CardDetails; error?: string }> {
     const user = this.getUserById(userId);
     if (!user) return { success: false, error: 'User not found.' };
 
-    const cardNum = `4552 ${user.accountNumber.slice(0, 4)} ${Math.floor(1000 + Math.random() * 9000)} ${Math.floor(1000 + Math.random() * 9000)}`;
-    const cardExpMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-    const cardExpYear = String((new Date().getFullYear() + 4) % 100).padStart(2, '0');
-    const cardExpiry = `${cardExpMonth}/${cardExpYear}`;
-    const cardCvv = String(Math.floor(100 + Math.random() * 900));
+    const now = new Date().toISOString();
+    const last4 = user.accountNumber.slice(-4);
+    const cardNum = `4552${user.accountNumber.slice(0, 4)}0000${last4}`.slice(0, 16);
+    const expMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+    const expYear = String((new Date().getFullYear() + 4) % 100).padStart(2, '0');
 
     const newCard: CardDetails = {
       id: `card_${Date.now()}`,
       cardNumber: cardNum,
       cardholderName: `${user.fullName} ${user.surname}`.toUpperCase(),
       cardHolder: `${user.fullName} ${user.surname}`.toUpperCase(),
-      expiryDate: cardExpiry,
-      cvv: cardCvv,
+      expiryDate: `${expMonth}/${expYear}`,
+      cvv: '•••', // Strictly masked: never persist raw CVV
       cardType: 'Aegis Platinum Digital Debit',
       brand: 'aegis',
       status: 'active',
@@ -2122,107 +3282,127 @@ class AegisStore {
       contactless: true,
       activationCode: user.pin,
       issuerName: 'Aegis Card Services & Global Clearing Gateway',
-      issuedAt: new Date().toISOString(),
+      issuedAt: now,
       limits: {
         onlinePayments: true,
         internationalUsage: true,
         atmWithdrawals: true,
-        contactless: true
-      }
+        contactless: true,
+      },
     };
-
-    user.card = newCard;
-    user.updatedAt = new Date().toISOString();
-
-    const notif: BankNotification = {
-      id: `notif_card_${Date.now()}`,
-      userId: user.uid,
-      title: 'Aegis Platinum Virtual Debit Card Issued',
-      message: `Your new Aegis Platinum Digital Debit Card ending in ${cardNum.slice(-4)} has been generated, embossed, and activated with EMV 256-bit security clearance.`,
-      type: 'success',
-      read: false,
-      createdAt: new Date().toISOString()
-    };
-
-    this.notifications.unshift(notif);
-    setLocal(CACHE_KEYS.USERS, this.users);
-    setLocal(CACHE_KEYS.NOTIFICATIONS, this.notifications);
 
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        card: newCard,
-        updatedAt: user.updatedAt
+      await updateDoc(doc(db, 'users', user.uid), { card: newCard, updatedAt: now });
+      await setDoc(doc(db, 'notifications', `notif_card_${Date.now()}`), {
+        id: `notif_card_${Date.now()}`,
+        userId: user.uid,
+        title: 'Aegis Platinum Virtual Card Issued',
+        message: `Your Aegis Platinum Digital Debit Card ending in ${last4} has been issued and activated.`,
+        type: 'success',
+        read: false,
+        createdAt: now,
       });
-      await setDoc(doc(db, 'notifications', notif.id), notif);
-    } catch (e) {
-      console.warn('Firestore card issuance offline update:', e);
+      return { success: true, card: newCard };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Card issuance failed.' };
     }
-
-    this.notify();
-    return { success: true, card: newCard };
   }
 
-  // ================= ACCOUNT RESTRICTION & SUSPENSION =================
-  public async toggleUserSuspension(userId: string, newStatus: 'active' | 'suspended'): Promise<{ success: boolean; error?: string }> {
+  public async activateCard(
+    userId: string,
+    activationCode: string
+  ): Promise<{ success: boolean; error?: string }> {
     const user = this.getUserById(userId);
-    if (!user) return { success: false, error: 'User not found' };
-
-    user.status = newStatus;
-    user.updatedAt = new Date().toISOString();
-
-    setLocal(CACHE_KEYS.USERS, this.users);
-
-    try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        status: newStatus,
-        updatedAt: user.updatedAt
-      });
-    } catch (e) {
-      console.warn('Firestore user status update offline:', e);
+    if (!user || !user.card) return { success: false, error: 'Card record not found.' };
+    if (user.card.status === 'blocked') {
+      return { success: false, error: 'This card is permanently blocked.' };
     }
-
-    this.addAuditLog({
-      adminEmail: 'newzelebarclaysupport@gmail.com',
-      action: newStatus === 'suspended' ? 'ACCOUNT_SUSPENDED' : 'ACCOUNT_REACTIVATED',
-      targetAccount: user.accountNumber,
-      details: `User account status updated to: ${newStatus.toUpperCase()}`
+    if (
+      user.card.activationCode &&
+      activationCode.trim() !== user.card.activationCode &&
+      activationCode.trim() !== user.pin
+    ) {
+      return { success: false, error: 'Invalid activation authorization code.' };
+    }
+    const updatedCard = { ...user.card, status: 'active' as const };
+    await updateDoc(doc(db, 'users', user.uid), {
+      card: updatedCard,
+      updatedAt: new Date().toISOString(),
     });
-
-    this.notify();
     return { success: true };
   }
 
-  // ================= DYNAMIC CRYPTO WALLET MANAGEMENT =================
-  public async updateCryptoSettings(params: { btcAddress: string; usdtAddress: string }): Promise<{ success: boolean; error?: string }> {
-    this.settings.btcAddress = params.btcAddress.trim();
-    this.settings.usdtAddress = params.usdtAddress.trim();
-    this.settings.updatedAt = new Date().toISOString();
-
-    setLocal(CACHE_KEYS.SETTINGS, this.settings);
-
-    try {
-      await setDoc(doc(db, 'settings', 'financial'), this.settings, { merge: true });
-    } catch (e) {
-      console.warn('Firestore settings update offline:', e);
+  public async toggleCardFreeze(
+    userId: string
+  ): Promise<{ success: boolean; newStatus?: 'active' | 'frozen'; error?: string }> {
+    const user = this.getUserById(userId);
+    if (!user || !user.card) return { success: false, error: 'Card record not found.' };
+    if (user.card.status === 'blocked') {
+      return { success: false, error: 'Blocked cards cannot be unfrozen.' };
     }
-
-    this.addAuditLog({
-      adminEmail: 'newzelebarclaysupport@gmail.com',
-      action: 'CRYPTO_WALLET_UPDATED',
-      details: `Dynamic deposit wallets updated: BTC=${params.btcAddress.slice(0, 8)}..., USDT=${params.usdtAddress.slice(0, 8)}...`
+    const newStatus = user.card.status === 'frozen' ? 'active' : 'frozen';
+    await updateDoc(doc(db, 'users', user.uid), {
+      card: { ...user.card, status: newStatus },
+      updatedAt: new Date().toISOString(),
     });
+    return { success: true, newStatus };
+  }
 
-    this.notify();
+  public async blockCard(userId: string, reason: string): Promise<{ success: boolean; error?: string }> {
+    const user = this.getUserById(userId);
+    if (!user || !user.card) return { success: false, error: 'Card record not found.' };
+    const now = new Date().toISOString();
+    await updateDoc(doc(db, 'users', user.uid), {
+      card: { ...user.card, status: 'blocked' as const },
+      updatedAt: now,
+    });
+    await setDoc(doc(db, 'notifications', `notif_block_${Date.now()}`), {
+      id: `notif_block_${Date.now()}`,
+      userId: user.uid,
+      title: 'Emergency Card Blocked',
+      message: `Your card ending in ${user.card.cardNumber.slice(-4)} has been blocked. Reason: ${reason || 'Security alert'}.`,
+      type: 'security',
+      read: false,
+      createdAt: now,
+    });
     return { success: true };
   }
 
-  // ================= REAL-TIME SUPPORT CHAT SYSTEM =================
+  public async requestReplacementCard(
+    userId: string
+  ): Promise<{ success: boolean; card?: CardDetails; error?: string }> {
+    return this.issueVirtualCard(userId);
+  }
+
+  public async updateCardSettings(
+    userId: string,
+    limits: Partial<CardLimits>
+  ): Promise<{ success: boolean; error?: string }> {
+    const user = this.getUserById(userId);
+    if (!user || !user.card) return { success: false, error: 'Card not found.' };
+    const nextLimits = {
+      ...(user.card.limits || {
+        onlinePayments: true,
+        internationalUsage: true,
+        atmWithdrawals: true,
+        contactless: true,
+      }),
+      ...limits,
+    };
+    await updateDoc(doc(db, 'users', user.uid), {
+      card: { ...user.card, limits: nextLimits },
+      updatedAt: new Date().toISOString(),
+    });
+    return { success: true };
+  }
+
+  // ==================== REAL-TIME SUPPORT CHAT ====================
   public getConversations(): SupportConversation[] {
     return [...this.chatConversations];
   }
 
   public getConversation(userId: string): SupportConversation | null {
-    return this.chatConversations.find(c => c.userId === userId) || null;
+    return this.chatConversations.find((c) => c.userId === userId) || null;
   }
 
   public getUnreadChatCountForAdmin(): number {
@@ -2230,47 +3410,43 @@ class AegisStore {
   }
 
   public markConversationReadByAdmin(userId: string): void {
-    const conv = this.chatConversations.find(c => c.userId === userId);
+    const conv = this.chatConversations.find((c) => c.userId === userId);
     if (conv && conv.unreadByAdminCount > 0) {
-      conv.unreadByAdminCount = 0;
-      conv.messages.forEach(m => {
-        if (m.senderRole === 'user') m.read = true;
-      });
-      setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
-      try {
-        setDoc(doc(db, 'chat_conversations', conv.id), conv, { merge: true });
-      } catch (e) {
-        console.warn('Firestore mark read offline:', e);
-      }
-      this.notify();
+      const updatedMsgs = conv.messages.map((m) =>
+        m.senderRole === 'user' ? { ...m, read: true } : m
+      );
+      setDoc(
+        doc(db, 'chat_conversations', conv.id),
+        { unreadByAdminCount: 0, messages: updatedMsgs },
+        { merge: true }
+      ).catch(() => {});
     }
   }
 
   public markAllConversationsReadByAdmin(): void {
-    this.chatConversations.forEach(conv => {
-      conv.unreadByAdminCount = 0;
-      conv.messages.forEach(m => {
-        if (m.senderRole === 'user') m.read = true;
-      });
-      try {
-        setDoc(doc(db, 'chat_conversations', conv.id), conv, { merge: true });
-      } catch (e) {
-        console.warn('Firestore mark all read offline:', e);
-      }
+    this.chatConversations.forEach((conv) => {
+      const updatedMsgs = conv.messages.map((m) =>
+        m.senderRole === 'user' ? { ...m, read: true } : m
+      );
+      setDoc(
+        doc(db, 'chat_conversations', conv.id),
+        { unreadByAdminCount: 0, messages: updatedMsgs },
+        { merge: true }
+      ).catch(() => {});
     });
-    setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
-    this.notify();
   }
 
   public markConversationReadByUser(userId: string): void {
-    const conv = this.chatConversations.find(c => c.userId === userId);
+    const conv = this.chatConversations.find((c) => c.userId === userId);
     if (conv && conv.unreadByUserCount > 0) {
-      conv.unreadByUserCount = 0;
-      conv.messages.forEach(m => {
-        if (m.senderRole === 'admin') m.read = true;
-      });
-      setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
-      this.notify();
+      const updatedMsgs = conv.messages.map((m) =>
+        m.senderRole === 'admin' ? { ...m, read: true } : m
+      );
+      setDoc(
+        doc(db, 'chat_conversations', conv.id),
+        { unreadByUserCount: 0, messages: updatedMsgs },
+        { merge: true }
+      ).catch(() => {});
     }
   }
 
@@ -2284,53 +3460,56 @@ class AegisStore {
     const now = new Date().toISOString();
     const msgId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
-    let conv = this.chatConversations.find(c => c.userId === params.userId);
-    if (!conv) {
-      conv = {
-        id: params.userId,
-        userId: params.userId,
-        userName: user ? `${user.fullName} ${user.surname}` : (params.senderName || 'Valued Client'),
-        userEmail: user?.email || '',
-        userAccountNumber: user?.accountNumber || '',
-        lastMessage: params.message,
-        lastMessageTime: now,
-        unreadByAdminCount: params.senderRole === 'user' ? 1 : 0,
-        unreadByUserCount: params.senderRole === 'admin' ? 1 : 0,
-        status: 'open',
-        messages: []
-      };
-      this.chatConversations.unshift(conv);
-    } else {
-      conv.lastMessage = params.message;
-      conv.lastMessageTime = now;
-      if (params.senderRole === 'user') {
-        conv.unreadByAdminCount = (conv.unreadByAdminCount || 0) + 1;
-      } else {
-        conv.unreadByUserCount = (conv.unreadByUserCount || 0) + 1;
-      }
-    }
-
+    const existingConv = this.chatConversations.find((c) => c.userId === params.userId);
     const newMsg: ChatMessage = {
       id: msgId,
       chatId: params.userId,
-      senderId: params.senderRole === 'user' ? params.userId : 'admin',
+      senderId: params.senderRole === 'user' ? params.userId : auth.currentUser?.uid || 'admin',
       senderRole: params.senderRole,
-      senderName: params.senderRole === 'admin' ? 'Aegis Support Desk' : (user ? `${user.fullName}` : 'Client'),
+      senderName:
+        params.senderRole === 'admin'
+          ? 'Aegis Support Desk'
+          : user
+          ? `${user.fullName} ${user.surname}`
+          : params.senderName || 'Client',
       message: params.message.trim(),
       timestamp: now,
-      read: false
+      read: false,
     };
 
-    conv.messages.push(newMsg);
-    setLocal(CACHE_KEYS.CHAT_CONVERSATIONS, this.chatConversations);
+    const nextConv: SupportConversation = existingConv
+      ? {
+          ...existingConv,
+          lastMessage: params.message.trim(),
+          lastMessageTime: now,
+          unreadByAdminCount:
+            params.senderRole === 'user'
+              ? (existingConv.unreadByAdminCount || 0) + 1
+              : existingConv.unreadByAdminCount || 0,
+          unreadByUserCount:
+            params.senderRole === 'admin'
+              ? (existingConv.unreadByUserCount || 0) + 1
+              : existingConv.unreadByUserCount || 0,
+          messages: [...existingConv.messages, newMsg],
+        }
+      : {
+          id: params.userId,
+          userId: params.userId,
+          userName: user ? `${user.fullName} ${user.surname}` : params.senderName || 'Valued Client',
+          userEmail: user?.email || '',
+          userAccountNumber: user?.accountNumber || '',
+          lastMessage: params.message.trim(),
+          lastMessageTime: now,
+          unreadByAdminCount: params.senderRole === 'user' ? 1 : 0,
+          unreadByUserCount: params.senderRole === 'admin' ? 1 : 0,
+          status: 'open',
+          messages: [newMsg],
+        };
 
-    try {
-      setDoc(doc(db, 'chat_conversations', conv.id), conv, { merge: true });
-    } catch (e) {
-      console.warn('Firestore send chat offline:', e);
-    }
+    setDoc(doc(db, 'chat_conversations', nextConv.id), nextConv, { merge: true }).catch((e) =>
+      console.warn('Firestore chat message write warning:', e)
+    );
 
-    this.notify();
     return newMsg;
   }
 }

@@ -1,42 +1,42 @@
 import React, { useState } from 'react';
-import { 
-  CreditCard, 
-  ArrowUpRight, 
-  ArrowDownLeft, 
+import {
+  CreditCard,
+  ArrowUpRight,
+  ArrowDownLeft,
   ArrowDownRight,
-  Send, 
-  ShieldCheck, 
-  Copy, 
-  Check, 
-  Eye, 
-  EyeOff, 
-  FileText, 
-  Clock, 
-  CheckCircle2, 
-  Sparkles, 
-  Headphones, 
-  Settings, 
-  Search, 
-  Filter, 
-  Lock, 
-  TrendingUp, 
+  Send,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  FileText,
+  Clock,
+  Sparkles,
+  Search,
+  TrendingUp,
   Zap,
-  DollarSign,
   AlertCircle,
   Snowflake,
   ShieldAlert,
-  RefreshCw,
-  Sliders,
   CheckCircle,
-  KeyRound,
-  Mail,
   Menu,
   Bell,
-  Building2,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Gift,
+  Building2
 } from 'lucide-react';
-import { UserProfile, BankTransaction, FinancialSettings, CardDetails, CardLimits } from '../types';
+import {
+  UserProfile,
+  BankTransaction,
+  FinancialSettings,
+  CardDetails,
+  DepositRecord,
+  WithdrawalRecord,
+  InvestmentPlan,
+  UserInvestment,
+  ReferralRecord
+} from '../types';
 import { store } from '../lib/store';
 import { BrandLogo } from './BrandLogo';
 import { CustomerNavDrawer } from './CustomerNavDrawer';
@@ -46,10 +46,19 @@ import { SecuritySettingsModal } from './SecuritySettingsModal';
 import { HistoryModal } from './HistoryModal';
 import { PaymentMethodsModal } from './PaymentMethodsModal';
 import { AccountSettingsModal } from './AccountSettingsModal';
+import { InvestmentsModal } from './InvestmentsModal';
+import { ReferralsModal } from './ReferralsModal';
+
+const CREDIT_TYPES = new Set(['deposit', 'crypto_payment', 'investment_payout', 'referral_bonus']);
 
 interface UserDashboardProps {
   currentUser: UserProfile;
   transactions: BankTransaction[];
+  deposits: DepositRecord[];
+  withdrawals: WithdrawalRecord[];
+  investmentPlans: InvestmentPlan[];
+  investments: UserInvestment[];
+  referrals: ReferralRecord[];
   settings: FinancialSettings;
   onOpenDeposit: () => void;
   onOpenTransfer: () => void;
@@ -64,6 +73,11 @@ interface UserDashboardProps {
 export const UserDashboard: React.FC<UserDashboardProps> = ({
   currentUser,
   transactions,
+  deposits,
+  withdrawals,
+  investmentPlans,
+  investments,
+  referrals,
   settings,
   onOpenDeposit,
   onOpenTransfer,
@@ -77,9 +91,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   const [showBalance, setShowBalance] = useState(true);
   const [showCardNumber, setShowCardNumber] = useState(false);
   const [copiedAcc, setCopiedAcc] = useState(false);
-  const [copiedCard, setCopiedCard] = useState(false);
 
-  // Modals state triggered via hamburger menu or shortcuts
+  // Modals state triggered via hamburger menu or dashboard quick actions
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
   const [accountInfoModalOpen, setAccountInfoModalOpen] = useState(false);
@@ -88,6 +101,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
   const [historyInitialFilter, setHistoryInitialFilter] = useState<'all' | 'withdrawals'>('all');
   const [paymentMethodsModalOpen, setPaymentMethodsModalOpen] = useState(false);
   const [accountSettingsModalOpen, setAccountSettingsModalOpen] = useState(false);
+  const [investmentsModalOpen, setInvestmentsModalOpen] = useState(false);
+  const [referralsModalOpen, setReferralsModalOpen] = useState(false);
 
   // Card Controls Modal state
   const [activationModalOpen, setActivationModalOpen] = useState(false);
@@ -106,7 +121,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     cardNumber: `4552${currentUser.accountNumber.slice(0, 4)}00000000`.slice(0, 16),
     cardHolder: `${currentUser.fullName} ${currentUser.surname}`.toUpperCase(),
     expiryDate: '11/29',
-    cvv: '849',
+    cvv: '•••',
     cardType: 'Aegis Platinum Digital Debit',
     brand: 'aegis',
     status: 'inactive',
@@ -129,13 +144,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     setTimeout(() => setCopiedAcc(false), 2000);
   };
 
-  const copyCardNumber = () => {
-    navigator.clipboard.writeText(card.cardNumber);
-    setCopiedCard(true);
-    setTimeout(() => setCopiedCard(false), 2000);
-  };
-
-  // On-demand Genuine Card Issuance Handler per Requirement 3
   const handleIssueCard = async () => {
     setCardActionMsg(null);
     setCardActionLoading(true);
@@ -156,7 +164,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     }
   };
 
-  // Card Activation Handler
   const handleActivateCard = async (e: React.FormEvent) => {
     e.preventDefault();
     setCardActionMsg(null);
@@ -178,7 +185,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     }
   };
 
-  // Freeze / Unfreeze Handler
   const handleToggleFreeze = async () => {
     setCardActionMsg(null);
     setCardActionLoading(true);
@@ -199,7 +205,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     }
   };
 
-  // Format 16-digit card number with masks
   const formatCardNumber = (num: string, reveal: boolean) => {
     const clean = num.replace(/\s/g, '');
     if (reveal) {
@@ -208,7 +213,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     return `•••• •••• •••• ${clean.slice(-4)}`;
   };
 
-  // Format 10-digit account number with spaces (e.g. 1000 0000 01)
   const formatAccountNumber = (acc: string) => {
     if (acc.length === 10) {
       return `${acc.slice(0, 4)} ${acc.slice(4, 8)} ${acc.slice(8, 10)}`;
@@ -216,7 +220,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
     return acc;
   };
 
-  // Filter recent transactions
   const filteredTransactions = transactions.filter((tx) => {
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -227,39 +230,45 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
       if (!matchRef && !matchDesc && !matchSender && !matchRecip) return false;
     }
 
-    if (txFilter === 'credit') return tx.type === 'deposit' || tx.type === 'crypto_payment';
-    if (txFilter === 'debit') return tx.type === 'transfer' || tx.type === 'withdrawal';
+    if (txFilter === 'credit') return CREDIT_TYPES.has(tx.type);
+    if (txFilter === 'debit') return !CREDIT_TYPES.has(tx.type);
     return true;
   });
 
   return (
     <div className="min-h-screen bg-[#0A192F] text-white pb-36 font-sans">
-      
-      {/* Redesigned Sub-header Welcome Section (Unnecessary button collection removed per Requirement 2) */}
+      {/* Welcome Bar */}
       <div className="bg-[#071324] border-b border-[#14233D] py-4 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-          
-          {/* Welcome User Info */}
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-cyan-300 font-black text-base sm:text-lg shrink-0">
-              {currentUser.fullName.charAt(0)}{currentUser.surname.charAt(0)}
-            </div>
+            <button
+              type="button"
+              onClick={() => setProfileModalOpen(true)}
+              className="w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center text-cyan-300 font-black text-base sm:text-lg shrink-0 overflow-hidden cursor-pointer"
+              title="Open Profile & Upload Picture"
+            >
+              {currentUser.photoUrl ? (
+                <img src={currentUser.photoUrl} alt={currentUser.fullName} className="w-full h-full object-cover" />
+              ) : (
+                `${currentUser.fullName.charAt(0)}${currentUser.surname.charAt(0)}`
+              )}
+            </button>
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h1 className="text-base sm:text-xl font-black text-white truncate">
                   Welcome, {currentUser.fullName} {currentUser.surname}
                 </h1>
                 <span className="hidden sm:inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-950 text-emerald-400 border border-emerald-800 shrink-0">
-                  Account Verified
+                  Account Active
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400 truncate mt-0.5">
-                Account: <strong className="font-mono text-cyan-300 font-bold">{currentUser.accountNumber}</strong> • Registered: <span className="text-slate-200">{currentUser.country}</span>
+                Account: <strong className="font-mono text-cyan-300 font-bold">{currentUser.accountNumber}</strong>
+                {currentUser.username ? ` (@${currentUser.username})` : ''} • {currentUser.country}
               </p>
             </div>
           </div>
 
-          {/* Quick Header Actions: Notifications & Hamburger Menu */}
           <div className="flex items-center gap-2 sm:gap-3 shrink-0">
             <button
               onClick={onOpenNotifications}
@@ -269,7 +278,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               <Bell className="w-4 h-4" />
             </button>
 
-            {/* Main Hamburger Menu Button opening 12-item Navigation Drawer */}
             <button
               onClick={() => setDrawerOpen(true)}
               className="px-3.5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs flex items-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer"
@@ -279,7 +287,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               <span className="hidden sm:inline">Menu</span>
             </button>
           </div>
-
         </div>
       </div>
 
@@ -306,8 +313,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
 
       {/* Main Content Area */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
-        
-        {/* Card Action Feedback Toast */}
         {cardActionMsg && (
           <div className={`p-4 rounded-2xl flex items-center justify-between text-xs font-medium border ${
             cardActionMsg.type === 'success'
@@ -322,19 +327,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
           </div>
         )}
 
-        {/* ================= PRIMARY DASHBOARD ROW: ACCOUNT CARD + SHORTCUTS ================= */}
+        {/* PRIMARY DASHBOARD ROW */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
-          {/* Main Account Balance & Primary Card (Redesigned per Requirement 2) */}
+          {/* Account Balance & Primary Card */}
           <div className="lg:col-span-7 rounded-3xl bg-gradient-to-br from-[#0c203b] via-[#081629] to-[#040c17] border border-blue-500/40 p-6 sm:p-8 shadow-2xl relative overflow-hidden space-y-6">
-            
-            {/* Ambient Card Glow */}
             <div className="absolute top-0 right-0 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Card Top Row: Brand & Tier Badge */}
             <div className="flex items-center justify-between relative z-10 gap-2">
               <BrandLogo variant="horizontal" size="sm" />
-              
               <button
                 onClick={onOpenTierUpgrade}
                 className="px-2.5 sm:px-3 py-1.5 rounded-full bg-blue-950/80 hover:bg-blue-900/80 text-cyan-300 border border-blue-500/40 text-[11px] sm:text-xs font-bold flex items-center gap-1.5 transition-all shadow shrink-0 cursor-pointer"
@@ -344,7 +344,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               </button>
             </div>
 
-            {/* 10-Digit Account Number */}
             <div className="space-y-1.5 relative z-10">
               <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400 block">
                 10-DIGIT ACCOUNT NUMBER
@@ -356,7 +355,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 <button
                   onClick={copyAccountNumber}
                   className="px-2.5 py-1 rounded-lg bg-[#00172e] hover:bg-[#002244] text-slate-300 hover:text-cyan-300 border border-[#002b52] text-xs font-semibold flex items-center gap-1 transition-colors"
-                  title="Copy Account Number"
                 >
                   {copiedAcc ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copiedAcc ? 'Copied' : 'Copy'}</span>
@@ -364,7 +362,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               </div>
             </div>
 
-            {/* Total Available Balance */}
             <div className="space-y-1.5 relative z-10 pt-2 border-t border-[#142642]">
               <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
                 <span>TOTAL AVAILABLE BALANCE</span>
@@ -380,15 +377,14 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
 
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl sm:text-4xl font-black text-white font-mono tracking-tight">
-                  {showBalance 
-                    ? `$${currentUser.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
+                  {showBalance
+                    ? `$${currentUser.balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                     : '••••••••••'}
                 </span>
-                <span className="text-xs font-bold text-cyan-400 font-mono">USD</span>
+                <span className="text-xs font-bold text-cyan-400 font-mono">{currentUser.currency || 'USD'}</span>
               </div>
             </div>
 
-            {/* Cardholder & 3 Organized Shortcuts (Full-width 3-column Grid, never clipped on mobile) */}
             <div className="pt-4 border-t border-[#142642] space-y-4 relative z-10">
               <div className="flex items-center justify-between text-xs">
                 <div>
@@ -401,7 +397,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 </div>
               </div>
 
-              {/* 3 Important Shortcuts (Requirement 2) */}
+              {/* 3 Primary Shortcuts */}
               <div className="grid grid-cols-3 gap-2 sm:gap-3 w-full">
                 <button
                   type="button"
@@ -430,19 +426,45 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   <span className="truncate">Withdraw</span>
                 </button>
               </div>
-            </div>
 
+              {/* Quick Feature Links: Investments, Referrals, Banking Info */}
+              <div className="grid grid-cols-3 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setInvestmentsModalOpen(true)}
+                  className="py-2 px-2 rounded-xl bg-[#071324] hover:bg-[#0d1f3a] border border-[#142642] text-emerald-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <TrendingUp className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Investments ({investments.filter(i => i.status === 'Active').length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReferralsModalOpen(true)}
+                  className="py-2 px-2 rounded-xl bg-[#071324] hover:bg-[#0d1f3a] border border-[#142642] text-amber-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Gift className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Referrals ({referrals.length})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPaymentMethodsModalOpen(true)}
+                  className="py-2 px-2 rounded-xl bg-[#071324] hover:bg-[#0d1f3a] border border-[#142642] text-cyan-300 text-[11px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Building2 className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Banking Info</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          {/* Redesigned Premium Virtual Debit Card Capsule (Requirement 3) */}
+          {/* Virtual Debit Card Capsule */}
           <div className="lg:col-span-5 rounded-3xl bg-[#001428] border border-[#00284d] p-6 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <CreditCard className="w-4 h-4 text-cyan-400" />
                 <h3 className="text-sm font-extrabold text-white">Aegis Platinum Card</h3>
               </div>
-              
-              {/* Neatly Positioned Card Status Badge (Requirement 3) */}
+
               <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
                 !isCardIssued
                   ? 'bg-purple-950/80 text-purple-300 border border-purple-700/60'
@@ -452,19 +474,15 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   ? 'bg-blue-950 text-blue-300 border border-blue-800'
                   : 'bg-amber-950 text-amber-400 border border-amber-800'
               }`}>
-                {!isCardIssued ? 'DEMO (UNISSUED)' : card.status.toUpperCase()}
+                {!isCardIssued ? 'UNISSUED' : card.status.toUpperCase()}
               </span>
             </div>
 
-            {/* Premium Dark-Mode Realistic Virtual Card Graphic (Requirement 3) */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0c1f38] via-[#071324] to-[#02070f] border border-slate-700/60 space-y-4 shadow-2xl relative overflow-hidden group">
-              {/* Metallic Sheen Overlay */}
+            <div className="p-5 rounded-2xl bg-gradient-to-br from-[#0c1f38] via-[#071324] to-[#02070f] border border-slate-700/60 space-y-4 shadow-2xl relative overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-tr from-cyan-500/5 via-transparent to-white/5 pointer-events-none" />
 
-              {/* Card Top Row: Chip, Contactless Symbol, and Card Network Branding */}
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-2.5">
-                  {/* Realistic Metallic Gold EMV Chip */}
                   <div className="w-10 h-7 rounded bg-gradient-to-tr from-amber-200 via-amber-400 to-amber-600 border border-amber-300/80 p-0.5 shadow-md">
                     <div className="w-full h-full border border-amber-800/40 rounded-sm grid grid-cols-2 gap-0.5">
                       <div className="border-r border-b border-amber-800/40" />
@@ -473,18 +491,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                       <div />
                     </div>
                   </div>
-
-                  {/* Contactless Wave Icon */}
-                  <div className="text-slate-400">
-                    <svg className="w-4 h-4 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                      <path d="M5 8a10 10 0 0 1 14 0" />
-                      <path d="M8 11a6 6 0 0 1 8 0" />
-                      <path d="M11 14a2 2 0 0 1 2 0" />
-                    </svg>
-                  </div>
                 </div>
 
-                {/* Authorized Network Branding */}
                 <div className="text-right">
                   <span className="font-mono text-[10px] font-black tracking-widest text-cyan-300 block">
                     AEGIS PLATINUM
@@ -495,10 +503,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Masked Card Number with Reveal Toggle (Requirement 3: •••• •••• •••• 1234) */}
               <div className="relative z-10 pt-1">
                 <div className="flex items-center justify-between">
-                  <p className="font-mono text-base sm:text-lg font-black tracking-widest text-white text-shadow-sm">
+                  <p className="font-mono text-base sm:text-lg font-black tracking-widest text-white">
                     {!isCardIssued
                       ? '•••• •••• •••• 0000'
                       : formatCardNumber(card.cardNumber, showCardNumber)}
@@ -508,7 +515,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                       type="button"
                       onClick={() => setShowCardNumber(!showCardNumber)}
                       className="text-slate-400 hover:text-white p-1 transition-colors"
-                      title={showCardNumber ? 'Mask card number' : 'Reveal card number'}
                     >
                       {showCardNumber ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                     </button>
@@ -516,7 +522,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Cardholder, Expiry Date & CVV */}
               <div className="flex items-center justify-between text-[10px] font-mono pt-2 border-t border-[#142642] relative z-10">
                 <div>
                   <span className="text-[8px] text-slate-400 uppercase tracking-wider block font-sans">Cardholder</span>
@@ -531,15 +536,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   </span>
                 </div>
                 <div>
-                  <span className="text-[8px] text-slate-400 uppercase tracking-wider block font-sans">CVV</span>
-                  <span className="text-white font-bold">
-                    {!isCardIssued ? '•••' : (showCardNumber ? card.cvv : '•••')}
-                  </span>
+                  <span className="text-[8px] text-slate-400 uppercase tracking-wider block font-sans">Security</span>
+                  <span className="text-white font-bold">TOKENIZED</span>
                 </div>
               </div>
             </div>
 
-            {/* Card Actions: Genuine Issuance or Active Controls */}
             {!isCardIssued ? (
               <div className="space-y-2 pt-1">
                 <button
@@ -548,11 +550,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-500 via-blue-600 to-indigo-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                 >
                   <Zap className="w-4 h-4 fill-white" />
-                  <span>{cardActionLoading ? 'Processing EMV Issuance...' : 'Request Genuine Virtual Card'}</span>
+                  <span>{cardActionLoading ? 'Issuing Virtual Card...' : 'Request Genuine Virtual Card'}</span>
                 </button>
-                <p className="text-[10px] text-slate-400 text-center">
-                  Simulated preview shown above. Card will be officially activated upon request.
-                </p>
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2 text-xs pt-1">
@@ -578,16 +577,106 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   onClick={() => setPaymentMethodsModalOpen(true)}
                   className="py-2.5 px-3 rounded-xl bg-[#00172e] hover:bg-[#002040] border border-[#00284d] text-cyan-300 font-bold text-center transition-colors flex items-center justify-center gap-1 active:scale-95"
                 >
-                  <span>Gateways</span>
+                  <span>Banking & Cards</span>
                   <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             )}
           </div>
-
         </div>
 
-        {/* ================= RECENT TRANSACTIONS LEDGER ================= */}
+        {/* DEPOSIT & WITHDRAWAL STATUS TRACKER (Preserves Cancelled History) */}
+        {(deposits.length > 0 || withdrawals.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-5 rounded-3xl bg-[#001428] border border-[#00284d] space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-emerald-400">
+                  Deposit Requests ({deposits.length})
+                </h4>
+                <button
+                  onClick={onOpenDeposit}
+                  className="text-[11px] font-bold text-cyan-400 hover:underline"
+                >
+                  + New Deposit
+                </button>
+              </div>
+              {deposits.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3">No deposit requests yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                  {deposits.slice(0, 5).map((dep) => (
+                    <div key={dep.id} className="p-2.5 rounded-xl bg-[#000d1a] border border-[#002244] flex items-center justify-between text-xs">
+                      <div className="min-w-0">
+                        <p className="font-bold text-white truncate">
+                          {dep.method.replace('_', ' ')} • ${dep.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-mono truncate">
+                          Ref: {dep.txHashOrRef}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                          dep.status === 'Approved'
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                            : dep.status === 'Pending'
+                            ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                            : 'bg-rose-950 text-rose-400 border border-rose-800'
+                        }`}
+                      >
+                        {dep.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 rounded-3xl bg-[#001428] border border-[#00284d] space-y-3">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-extrabold uppercase tracking-wider text-amber-400">
+                  Withdrawal Requests ({withdrawals.length})
+                </h4>
+                <button
+                  onClick={onOpenWithdrawal}
+                  className="text-[11px] font-bold text-cyan-400 hover:underline"
+                >
+                  + Request Withdrawal
+                </button>
+              </div>
+              {withdrawals.length === 0 ? (
+                <p className="text-xs text-slate-400 py-3">No withdrawal requests yet.</p>
+              ) : (
+                <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                  {withdrawals.slice(0, 5).map((wd) => (
+                    <div key={wd.id} className="p-2.5 rounded-xl bg-[#000d1a] border border-[#002244] flex items-center justify-between text-xs">
+                      <div className="min-w-0">
+                        <p className="font-bold text-white truncate">
+                          {wd.method === 'bank' ? 'Bank Payout' : 'Crypto Payout'} • ${wd.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-mono truncate">
+                          {wd.destination}
+                        </p>
+                      </div>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
+                          wd.status === 'Approved'
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-800'
+                            : wd.status === 'Pending'
+                            ? 'bg-amber-950 text-amber-400 border border-amber-800'
+                            : 'bg-rose-950 text-rose-400 border border-rose-800'
+                        }`}
+                      >
+                        {wd.status === 'Cancelled' ? 'Cancelled (Refunded)' : wd.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* RECENT TRANSACTIONS LEDGER */}
         <div className="p-6 rounded-3xl bg-[#001428] border border-[#00284d] shadow-xl space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#002447] pb-4">
             <div>
@@ -595,7 +684,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                 <Clock className="w-4 h-4 text-cyan-400" />
                 <h3 className="text-base font-extrabold text-white">Recent Transactions</h3>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">Real-time custody movements and wire status</p>
+              <p className="text-xs text-slate-400 mt-0.5">Real-time Cloud Firestore custody ledger</p>
             </div>
 
             <div className="flex items-center gap-2">
@@ -612,7 +701,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
           </div>
 
-          {/* Search & Filter Bar */}
           <div className="flex flex-col sm:flex-row items-center gap-3">
             <div className="relative flex-1 w-full">
               <Search className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
@@ -653,7 +741,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
           </div>
 
-          {/* Transactions List */}
           <div className="space-y-2.5">
             {filteredTransactions.length === 0 ? (
               <div className="py-12 text-center text-slate-400 text-xs">
@@ -661,7 +748,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
               </div>
             ) : (
               filteredTransactions.slice(0, 6).map((tx) => {
-                const isCredit = tx.type === 'deposit' || tx.type === 'crypto_payment';
+                const isCredit = CREDIT_TYPES.has(tx.type);
                 return (
                   <div
                     key={tx.id}
@@ -669,7 +756,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                        isCredit 
+                        isCredit
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                       }`}>
@@ -679,7 +766,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-bold text-xs text-white truncate">
-                            {isCredit ? (tx.senderName || 'Deposit Settlement') : (tx.recipientName || 'Outbound Wire')}
+                            {isCredit ? (tx.senderName || 'Deposit Settlement') : (tx.recipientName || 'Outbound Transfer')}
                           </p>
                           <span className={`px-2 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${
                             tx.status === 'Completed'
@@ -732,12 +819,9 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
             </div>
           )}
         </div>
-
       </div>
 
-      {/* ================= ALL 12 HAMBURGER MENU MODALS ================= */}
-
-      {/* 1. Customer Navigation Drawer (Opening all 12 requested working pages) */}
+      {/* Navigation Drawer & Modals */}
       <CustomerNavDrawer
         isOpen={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -757,33 +841,31 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
           setHistoryModalOpen(true);
         }}
         onOpenPaymentMethods={() => setPaymentMethodsModalOpen(true)}
+        onOpenInvestments={() => setInvestmentsModalOpen(true)}
+        onOpenReferrals={() => setReferralsModalOpen(true)}
         onOpenSupportCenter={onOpenSupport}
         onOpenSecuritySettings={() => setSecurityModalOpen(true)}
         onLogout={onLogout}
       />
 
-      {/* 2. Profile Modal */}
       <ProfileModal
         isOpen={profileModalOpen}
         onClose={() => setProfileModalOpen(false)}
         currentUser={currentUser}
       />
 
-      {/* 3. Account Information Modal */}
       <AccountInfoModal
         isOpen={accountInfoModalOpen}
         onClose={() => setAccountInfoModalOpen(false)}
         currentUser={currentUser}
       />
 
-      {/* 4. Security Settings Modal */}
       <SecuritySettingsModal
         isOpen={securityModalOpen}
         onClose={() => setSecurityModalOpen(false)}
         currentUser={currentUser}
       />
 
-      {/* 5. Transaction / Withdrawal History Modal */}
       <HistoryModal
         isOpen={historyModalOpen}
         onClose={() => setHistoryModalOpen(false)}
@@ -792,7 +874,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
         onViewReceipt={onOpenReceipt}
       />
 
-      {/* 6. Payment Methods Modal */}
       <PaymentMethodsModal
         isOpen={paymentMethodsModalOpen}
         onClose={() => setPaymentMethodsModalOpen(false)}
@@ -801,14 +882,28 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
         onOpenDeposit={onOpenDeposit}
       />
 
-      {/* 7. Account Settings Modal */}
       <AccountSettingsModal
         isOpen={accountSettingsModalOpen}
         onClose={() => setAccountSettingsModalOpen(false)}
         currentUser={currentUser}
       />
 
-      {/* Card Activation Modal */}
+      <InvestmentsModal
+        isOpen={investmentsModalOpen}
+        onClose={() => setInvestmentsModalOpen(false)}
+        currentUser={currentUser}
+        plans={investmentPlans}
+        investments={investments}
+      />
+
+      <ReferralsModal
+        isOpen={referralsModalOpen}
+        onClose={() => setReferralsModalOpen(false)}
+        currentUser={currentUser}
+        referrals={referrals}
+        settings={settings}
+      />
+
       {activationModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
           <div className="w-full max-w-sm bg-[#001020] border border-blue-500/40 rounded-3xl p-6 text-white space-y-4">
@@ -846,7 +941,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({
           </div>
         </div>
       )}
-
     </div>
   );
 };

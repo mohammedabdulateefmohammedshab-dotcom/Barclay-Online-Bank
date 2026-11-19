@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  Lock, 
-  User, 
-  Mail, 
-  Globe, 
-  KeyRound, 
-  Sparkles, 
-  ArrowRight, 
-  Eye, 
-  EyeOff, 
-  CheckCircle2, 
+import {
+  X,
+  Lock,
+  User,
+  Mail,
+  Globe,
+  KeyRound,
+  Sparkles,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  CheckCircle2,
   AlertCircle,
   Copy,
   Check,
-  HelpCircle,
   ArrowLeft,
-  ChevronDown
+  ChevronDown,
+  AtSign,
+  Gift
 } from 'lucide-react';
 import { SUPPORTED_COUNTRIES } from '../lib/banksData';
 import { store } from '../lib/store';
@@ -46,36 +47,38 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setInfoMessage('');
     }
   }, [isOpen, initialMode]);
+
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [infoMessage, setInfoMessage] = useState('');
-  
+
   // Registration Form State
+  const [username, setUsername] = useState('');
   const [fullName, setFullName] = useState('');
   const [surname, setSurname] = useState('');
   const [email, setEmail] = useState('');
   const [country, setCountry] = useState('United Kingdom');
   const [pin, setPin] = useState('');
   const [password, setPassword] = useState('');
+  const [referralCode, setReferralCode] = useState('');
 
   // Login Form State
-  const [loginIdentifier, setLoginIdentifier] = useState(''); // Email or 10-digit Account Number
-  const [loginSecret, setLoginSecret] = useState(''); // Password or 4-digit PIN
+  const [loginIdentifier, setLoginIdentifier] = useState(''); // Email, Username, or 10-digit Account Number
+  const [loginSecret, setLoginSecret] = useState(''); // Account Password
 
   // Forgot Password State
   const [recoveryIdentifier, setRecoveryIdentifier] = useState('');
 
-  // Welcome Modal state upon successful registration (Requirement 1 & 3: Do NOT auto-login, show welcome message & account number)
+  // Welcome Modal state upon successful registration (Do NOT auto-login; show permanent 10-digit account number)
   const [registeredUser, setRegisteredUser] = useState<UserProfile | null>(null);
   const [copiedAcc, setCopiedAcc] = useState(false);
 
   if (!isOpen) return null;
 
-  // Password validation: letters, numbers, and at least one special character (!, ?, ., :, /, $, &, or @)
   const hasLetters = /[a-zA-Z]/.test(password);
   const hasNumbers = /[0-9]/.test(password);
-  const hasSpecial = /[!?. :/$&@]/.test(password);
+  const hasSpecial = /[!?. :/$&@#^*_\-+=]/.test(password);
   const isPasswordValid = hasLetters && hasNumbers && hasSpecial && password.length >= 8;
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -99,25 +102,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
 
     if (!isPasswordValid) {
-      setErrorMessage('Password must contain at least 8 characters, letters, numbers, and at least one special character (!, ?, ., :, /, $, &, @).');
+      setErrorMessage('Password must contain at least 8 characters, letters, numbers, and at least one special character.');
       return;
     }
 
     setLoading(true);
     try {
       const result = await store.registerUser({
+        username: username.trim() || undefined,
         fullName,
         surname,
         email,
         country,
         pin,
-        password
+        password,
+        referralCode: referralCode.trim() || undefined
       });
 
       if (result.error || !result.user) {
         setErrorMessage(result.error || 'Registration failed');
       } else {
-        // Trigger celebratory confetti
         confetti({
           particleCount: 80,
           spread: 70,
@@ -138,12 +142,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setInfoMessage('');
 
     if (!loginIdentifier.trim()) {
-      setErrorMessage('Please enter your 10-digit Account Number or registered Email.');
+      setErrorMessage('Please enter your Email, Username, or 10-Digit Account Number.');
       return;
     }
 
     if (!loginSecret.trim()) {
-      setErrorMessage('Please enter your Secure PIN or Password.');
+      setErrorMessage('Please enter your account password.');
       return;
     }
 
@@ -169,7 +173,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setInfoMessage('');
 
     if (!recoveryIdentifier.trim()) {
-      setErrorMessage('Please enter your registered email address or 10-digit account number.');
+      setErrorMessage('Please enter your registered email address, username, or 10-digit account number.');
       return;
     }
 
@@ -179,7 +183,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       if (res.error || !res.success) {
         setErrorMessage(res.error || 'Unable to locate account for recovery.');
       } else {
-        setInfoMessage(res.message || 'Password recovery instructions processed.');
+        setInfoMessage(res.message || 'Password recovery email dispatched.');
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Password recovery failed.');
@@ -188,21 +192,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-
   const copyAccountNumber = (acc: string) => {
     navigator.clipboard.writeText(acc);
     setCopiedAcc(true);
     setTimeout(() => setCopiedAcc(false), 2000);
   };
 
-  // Welcome Screen when user registration completes
-  // Requirement 1 & 3: Display welcome message with name & 10-digit account number, then redirect to login page (DO NOT auto-login).
   if (registeredUser) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
         <div className="relative w-full max-w-lg bg-[#131620] border border-white/10 rounded-3xl shadow-2xl p-6 sm:p-8 text-white text-center">
-          
-          {/* Redesigned Emblem Brand Logo */}
           <div className="flex justify-center mb-3">
             <BrandLogo variant="stacked" size="md" showTagline={false} />
           </div>
@@ -212,7 +211,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </div>
 
           <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-950 text-blue-300 border border-blue-800">
-            Registration Complete
+            Permanent Account Created
           </span>
 
           <h3 className="text-2xl font-black text-white mt-3">
@@ -220,16 +219,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </h3>
 
           <p className="text-sm text-slate-300 mt-2">
-            Welcome, <strong className="text-white">{registeredUser.fullName} {registeredUser.surname}</strong>. Your account has been securely registered in our system. Please take note of your account number below to sign in.
+            Welcome, <strong className="text-white">{registeredUser.fullName} {registeredUser.surname}</strong>. Your profile has been permanently saved in Cloud Firestore. Take note of your unique 10-digit account number to sign in.
           </p>
 
-          {/* Generated 10-Digit Account Number Card */}
           <div className="my-6 p-4 rounded-2xl bg-[#0F223D] border border-blue-500/30 shadow-inner text-left">
             <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
-              <span>YOUR UNIQUE 10-DIGIT ACCOUNT NUMBER</span>
-              <span className="text-emerald-400 font-semibold">• Active & Verified</span>
+              <span>YOUR PERMANENT 10-DIGIT ACCOUNT NUMBER</span>
+              <span className="text-emerald-400 font-semibold">• Active & Synced</span>
             </div>
-            
+
             <div className="flex items-center justify-between bg-[#0A192F] px-4 py-3 rounded-xl border border-blue-500/40">
               <span className="font-mono text-2xl font-black tracking-widest text-blue-400">
                 {registeredUser.accountNumber}
@@ -250,28 +248,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <span className="font-semibold text-blue-300">{registeredUser.tier}</span>
               </div>
               <div>
-                <span className="text-slate-400">Initial Balance: </span>
+                <span className="text-slate-400">Opening Balance: </span>
                 <span className="font-semibold text-slate-200">$0.00 USD</span>
               </div>
               <div>
-                <span className="text-slate-400">Country: </span>
-                <span className="font-medium text-white">{registeredUser.country}</span>
+                <span className="text-slate-400">Username: </span>
+                <span className="font-mono font-medium text-white">@{registeredUser.username}</span>
               </div>
               <div>
-                <span className="text-slate-400">SWIFT Auth Code: </span>
-                <span className="font-mono font-bold text-amber-300">{registeredUser.swiftVerificationCode}</span>
+                <span className="text-slate-400">Referral Code: </span>
+                <span className="font-mono font-bold text-amber-300">{registeredUser.referralCode}</span>
               </div>
             </div>
           </div>
 
-          {/* Notice: Redirects to Sign In (Requirement 3: Do not automatically log users into accounts) */}
           <button
             onClick={() => {
               const acc = registeredUser.accountNumber;
               setRegisteredUser(null);
               setMode('login');
               setLoginIdentifier(acc);
-              setInfoMessage(`Account ${acc} registered! Please enter your PIN or Password to log in.`);
+              setInfoMessage(`Account ${acc} registered in Firestore! Sign in with your account password to continue.`);
             }}
             className="w-full py-3.5 px-6 rounded-full bg-gradient-to-r from-[#2176ff] via-[#4f46e5] to-[#7c3aed] hover:opacity-95 text-white font-bold text-sm tracking-wide shadow-lg shadow-blue-600/25 flex items-center justify-center gap-2 transition-all cursor-pointer"
           >
@@ -286,7 +283,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
       <div className="relative w-full max-w-md bg-[#131620] border border-white/15 rounded-3xl shadow-2xl overflow-hidden text-white">
-        
         {/* Header with Brand Logo */}
         <div className="px-6 pt-5 pb-4 border-b border-white/[0.08] flex items-center justify-between bg-[#0d0f17]">
           <div className="flex items-center gap-3">
@@ -354,11 +350,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {mode === 'login' && (
-            /* Login Form */
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  10-Digit Account Number or Registered Email
+                  Email, Username, or 10-Digit Account Number
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -366,7 +361,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
-                    placeholder="e.g. 4829103847 or user@aegisbank.com"
+                    placeholder="e.g. name@example.com, username, or 4829103847"
                     className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />
@@ -376,7 +371,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="block text-xs font-semibold text-slate-300">
-                    Secure PIN (4 Digits) or Password
+                    Account Password
                   </label>
                   <button
                     type="button"
@@ -392,7 +387,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={loginSecret}
                     onChange={(e) => setLoginSecret(e.target.value)}
-                    placeholder="Enter your 4-digit PIN or password"
+                    placeholder="Enter your account password"
                     className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-9 pr-10 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />
@@ -418,12 +413,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           )}
 
           {mode === 'register' && (
-            /* Registration Form */
             <form onSubmit={handleRegister} className="space-y-3.5">
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Full Name <span className="text-blue-400">*</span>
+                    First Name <span className="text-blue-400">*</span>
                   </label>
                   <input
                     type="text"
@@ -447,6 +441,40 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                     required
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Username
+                  </label>
+                  <div className="relative">
+                    <AtSign className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value.replace(/[^a-zA-Z0-9_.-]/g, ''))}
+                      placeholder="r.jenkins"
+                      className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">
+                    Referral Code (Optional)
+                  </label>
+                  <div className="relative">
+                    <Gift className="absolute left-3 top-2.5 w-3.5 h-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                      placeholder="AEG-123456"
+                      className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-8 pr-3 py-2 text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -494,7 +522,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Secure PIN (Exactly 4 Digits) <span className="text-blue-400">*</span>
+                  Secure Transaction PIN (4 Digits) <span className="text-blue-400">*</span>
                 </label>
                 <div className="relative">
                   <KeyRound className="absolute left-3 top-2.5 w-4 h-4 text-slate-400" />
@@ -508,7 +536,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     required
                   />
                 </div>
-                <p className="text-[10px] text-slate-400 mt-0.5">Used for quick transaction authorization & PIN login.</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Used to authorize withdrawals and card controls.</p>
               </div>
 
               <div>
@@ -521,7 +549,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Must contain letters, numbers, and special character"
+                    placeholder="Letters, numbers, and special character"
                     className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-9 pr-10 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500"
                     required
                   />
@@ -534,7 +562,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   </button>
                 </div>
 
-                {/* Password Criteria Checklist per Requirement 1 */}
                 <div className="mt-2 p-2.5 rounded-xl bg-[#071324] border border-[#1E293B] space-y-1 text-[10px]">
                   <p className="font-semibold text-slate-400">Password Requirements:</p>
                   <div className="grid grid-cols-2 gap-1">
@@ -545,7 +572,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                       <CheckCircle2 className="w-3 h-3" /> Numbers (0-9)
                     </span>
                     <span className={`flex items-center gap-1 ${hasSpecial ? 'text-emerald-400' : 'text-slate-400'}`}>
-                      <CheckCircle2 className="w-3 h-3" /> Special (!?. :/$&@)
+                      <CheckCircle2 className="w-3 h-3" /> Special character
                     </span>
                     <span className={`flex items-center gap-1 ${password.length >= 8 ? 'text-emerald-400' : 'text-slate-400'}`}>
                       <CheckCircle2 className="w-3 h-3" /> At least 8 characters
@@ -559,22 +586,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 disabled={loading || !isPasswordValid || pin.length !== 4}
                 className="w-full mt-3 py-3 px-4 rounded-full bg-gradient-to-r from-[#2176ff] via-[#4f46e5] to-[#7c3aed] hover:opacity-95 text-white font-bold text-sm shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 transition-all disabled:opacity-40 cursor-pointer"
               >
-                {loading ? 'Registering & Generating Number...' : 'Complete Registration'}
+                {loading ? 'Creating Permanent Account...' : 'Complete Registration'}
                 <ArrowRight className="w-4 h-4" />
               </button>
             </form>
           )}
 
           {mode === 'forgot' && (
-            /* Forgot Password Recovery */
             <form onSubmit={handleForgotPassword} className="space-y-4">
               <div className="text-xs text-slate-300">
-                <p>Enter the email address or 10-digit account number associated with your Aegis Online Bank account. We will securely verify your account and issue temporary recovery credentials.</p>
+                <p>Enter your registered email address, username, or 10-digit account number. We will dispatch a Firebase password reset link to your registered email.</p>
               </div>
 
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">
-                  Registered Email or 10-Digit Account Number
+                  Email, Username, or 10-Digit Account Number
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
@@ -582,7 +608,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     type="text"
                     value={recoveryIdentifier}
                     onChange={(e) => setRecoveryIdentifier(e.target.value)}
-                    placeholder="e.g. 4829103847 or alexander@aegisbank.com"
+                    placeholder="e.g. 4829103847 or user@example.com"
                     className="w-full bg-[#0F223D] border border-[#1E293B] rounded-xl pl-9 pr-3 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors"
                     required
                   />
@@ -594,7 +620,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 disabled={loading}
                 className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 text-white font-bold text-sm shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
               >
-                {loading ? 'Searching & Verifying...' : 'Recover Password'}
+                {loading ? 'Sending Reset Link...' : 'Send Password Reset Email'}
                 <ArrowRight className="w-4 h-4" />
               </button>
 
@@ -610,7 +636,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
             </form>
           )}
-
         </div>
       </div>
     </div>

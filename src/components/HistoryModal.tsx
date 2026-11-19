@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Clock, Search, Filter, ArrowUpRight, ArrowDownLeft, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, Clock, Search, ArrowUpRight, ArrowDownLeft, FileText } from 'lucide-react';
 import { BankTransaction } from '../types';
 
 interface HistoryModalProps {
@@ -9,6 +9,8 @@ interface HistoryModalProps {
   initialFilter?: 'all' | 'withdrawals';
   onViewReceipt: (tx: BankTransaction) => void;
 }
+
+const CREDIT_TYPES = new Set(['deposit', 'crypto_payment', 'investment_payout', 'referral_bonus']);
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
   isOpen,
@@ -35,15 +37,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     }
 
     if (filterType === 'withdrawals') return tx.type === 'withdrawal';
-    if (filterType === 'credits') return tx.type === 'deposit' || tx.type === 'crypto_payment';
-    if (filterType === 'debits') return tx.type === 'transfer' || tx.type === 'withdrawal';
+    if (filterType === 'credits') return CREDIT_TYPES.has(tx.type);
+    if (filterType === 'debits') return !CREDIT_TYPES.has(tx.type);
     return true;
   });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200 font-sans">
       <div className="relative w-full max-w-2xl bg-[#001020] border border-blue-500/40 rounded-3xl shadow-2xl overflow-hidden text-white flex flex-col max-h-[85vh]">
-        
         {/* Header */}
         <div className="p-6 bg-[#000d1a] border-b border-[#002447] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
@@ -54,7 +55,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               <h3 className="text-base font-black text-white">
                 {filterType === 'withdrawals' ? 'Withdrawal History' : 'Transaction History & Ledgers'}
               </h3>
-              <p className="text-xs text-slate-400">Complete immutable record of all custody operations</p>
+              <p className="text-xs text-slate-400">Permanent Cloud Firestore custody record</p>
             </div>
           </div>
 
@@ -125,7 +126,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             </div>
           ) : (
             filtered.map((tx) => {
-              const isCredit = tx.type === 'deposit' || tx.type === 'crypto_payment';
+              const isCredit = CREDIT_TYPES.has(tx.type);
               return (
                 <div
                   key={tx.id}
@@ -133,7 +134,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                      isCredit 
+                      isCredit
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                     }`}>
@@ -143,7 +144,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-xs text-white truncate">
-                          {isCredit ? (tx.senderName || 'Inbound Deposit') : (tx.recipientName || 'Outbound Wire')}
+                          {isCredit ? (tx.senderName || 'Inbound Credit') : (tx.recipientName || 'Outbound Debit')}
                         </p>
                         <span className={`px-2 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider ${
                           tx.status === 'Completed'
@@ -183,7 +184,6 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             })
           )}
         </div>
-
       </div>
     </div>
   );

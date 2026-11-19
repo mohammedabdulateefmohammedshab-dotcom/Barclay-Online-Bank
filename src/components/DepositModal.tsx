@@ -1,20 +1,19 @@
 import React, { useState } from 'react';
-import { 
-  X, 
-  Copy, 
-  Check, 
-  Upload, 
-  ArrowRight, 
-  Building2, 
-  AlertCircle, 
-  CheckCircle2, 
-  ShieldCheck, 
-  QrCode,
-  FileText,
-  DollarSign
+import {
+  X,
+  Copy,
+  Check,
+  Upload,
+  ArrowRight,
+  Building2,
+  AlertCircle,
+  CheckCircle2,
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { UserProfile, FinancialSettings } from '../types';
 import { store } from '../lib/store';
+import { uploadMediaFile } from '../lib/firebase';
 import { BrandLogo } from './BrandLogo';
 
 interface DepositModalProps {
@@ -34,12 +33,12 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   const [selectedCrypto, setSelectedCrypto] = useState<'BTC' | 'USDT'>('BTC');
   const [copiedText, setCopiedText] = useState<string | null>(null);
 
-  // "I Have Made the Payment" modal state
   const [showProofModal, setShowProofModal] = useState(false);
   const [proofAmount, setProofAmount] = useState('');
   const [proofTxHash, setProofTxHash] = useState('');
   const [proofNotes, setProofNotes] = useState('');
   const [proofImage, setProofImage] = useState<string>('');
+  const [uploadingProof, setUploadingProof] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -52,19 +51,23 @@ export const DepositModal: React.FC<DepositModalProps> = ({
     setTimeout(() => setCopiedText(null), 2500);
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) {
-        setSubmitError('File is too large. Please select an image under 2MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setProofImage(reader.result as string);
-        setSubmitError('');
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setSubmitError('File exceeds 5MB maximum limit.');
+      return;
+    }
+
+    setUploadingProof(true);
+    setSubmitError('');
+    try {
+      const res = await uploadMediaFile(file, `deposit_proofs/${currentUser.uid}`);
+      setProofImage(res.url);
+    } catch (err: any) {
+      setSubmitError(err?.message || 'Failed to upload deposit proof.');
+    } finally {
+      setUploadingProof(false);
     }
   };
 
@@ -110,7 +113,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         }, 2200);
       }
     } catch (err: any) {
-      setSubmitError(err.message || 'Failed to submit payment proof.');
+      setSubmitError(err.message || 'Failed to submit deposit request.');
     } finally {
       setIsSubmitting(false);
     }
@@ -119,7 +122,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg bg-[#00172e] border border-[#003866] rounded-2xl shadow-2xl overflow-hidden text-white">
-        
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#002b52] flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -159,17 +161,14 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 : 'text-slate-400 border-transparent hover:text-slate-200'
             }`}
           >
-            International Wire / SWIFT
+            International Wire / Bank Transfer
           </button>
         </div>
 
         <div className="p-6 max-h-[75vh] overflow-y-auto">
           {activeTab === 'crypto' ? (
-            /* Cryptocurrency Section (Requirement 5 & 6) */
             <div className="space-y-5">
-              {/* Token Selector: Bitcoin vs USDT ERC-20 */}
               <div className="grid grid-cols-2 gap-3">
-                {/* Bitcoin Card */}
                 <button
                   type="button"
                   onClick={() => setSelectedCrypto('BTC')}
@@ -179,7 +178,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       : 'bg-[#001c38] border-[#003366] hover:border-slate-500'
                   }`}
                 >
-                  {/* Bitcoin SVG Logo */}
                   <div className="w-10 h-10 rounded-full bg-[#F7931A] text-white flex items-center justify-center font-bold text-lg shadow shrink-0">
                     ₿
                   </div>
@@ -189,7 +187,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   </div>
                 </button>
 
-                {/* USDT Card */}
                 <button
                   type="button"
                   onClick={() => setSelectedCrypto('USDT')}
@@ -199,7 +196,6 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       : 'bg-[#001c38] border-[#003366] hover:border-slate-500'
                   }`}
                 >
-                  {/* Tether USDT SVG Logo */}
                   <div className="w-10 h-10 rounded-full bg-[#26A17B] text-white flex items-center justify-center font-black text-sm shadow shrink-0">
                     ₮
                   </div>
@@ -210,14 +206,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 </button>
               </div>
 
-              {/* Display Wallet Address */}
               <div className="p-4 rounded-xl bg-[#001f3d] border border-[#003866] space-y-3">
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold text-slate-300">
                     {selectedCrypto === 'BTC' ? 'Official Bitcoin Deposit Address' : 'Official USDT (ERC-20) Address'}
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 font-mono border border-cyan-800">
-                    Real-Time Live Sync
+                    Live Treasury Sync
                   </span>
                 </div>
 
@@ -225,7 +220,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   <p className="font-mono text-xs text-cyan-300 break-all select-all font-semibold">
                     {selectedCrypto === 'BTC' ? settings.btcAddress : settings.usdtAddress}
                   </p>
-                  
+
                   <div className="flex items-center justify-between pt-1 border-t border-[#002447]">
                     <span className="text-[10px] text-slate-400">
                       Network: <strong className="text-white">{selectedCrypto === 'BTC' ? 'Bitcoin Native (SegWit)' : 'Ethereum ERC-20'}</strong>
@@ -243,23 +238,20 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   </div>
                 </div>
 
-                {/* Simulated QR Code Box */}
                 <div className="flex items-center gap-4 bg-[#001830] p-3 rounded-lg border border-[#00284d]">
                   <div className="w-16 h-16 bg-white p-1 rounded-md flex items-center justify-center shrink-0">
-                    {/* SVG QR Code Pattern */}
                     <svg viewBox="0 0 24 24" className="w-full h-full text-slate-900" fill="currentColor">
                       <path d="M2 2h8v8H2zm2 2v4h4V4zm10-2h8v8h-8zm2 2v4h4V4zM2 14h8v8H2zm2 2v4h4v-4zm14-2h4v2h-4zm-4 0h2v4h-2zm2 4h4v4h-4zm-2 2h2v2h-2zm6-4h2v6h-2z" />
                     </svg>
                   </div>
                   <div className="text-xs text-slate-300 space-y-0.5">
-                    <p className="font-semibold text-white">Scan with Mobile Wallet</p>
+                    <p className="font-semibold text-white">Deposit Verification Flow</p>
                     <p className="text-[11px] text-slate-400">Minimum deposit: 50 USD equivalent.</p>
-                    <p className="text-[11px] text-slate-400">Credited automatically after approval by the authorized payment verification team.</p>
+                    <p className="text-[11px] text-slate-400">Deposits remain <strong>Pending</strong> until approved by Admin; your balance is credited once per approved deposit.</p>
                   </div>
                 </div>
               </div>
 
-              {/* Requirement 6: "I Have Made the Payment" Button */}
               <div className="pt-2">
                 <button
                   type="button"
@@ -269,36 +261,32 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                   <CheckCircle2 className="w-5 h-5 text-slate-950" />
                   <span>I Have Made the Payment</span>
                 </button>
-                <p className="text-[11px] text-center text-slate-400 mt-2">
-                  Click after sending crypto to submit your transaction hash and receipt proof for review by the authorized payment verification team.
-                </p>
               </div>
             </div>
           ) : (
-            /* International Wire / SWIFT Section */
             <div className="space-y-4">
               <div className="p-4 rounded-xl bg-[#001f3d] border border-[#003866] space-y-3">
                 <div className="flex items-center gap-2 text-xs font-bold text-cyan-400 uppercase tracking-wide">
                   <Building2 className="w-4 h-4" />
-                  <span>Aegis Official Clearing Bank Coordinates</span>
+                  <span>Official Clearing Bank Coordinates</span>
                 </div>
 
                 <div className="space-y-2 text-xs">
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
                     <span className="text-slate-400">Beneficiary Bank:</span>
-                    <span className="font-semibold text-white">Aegis Clearing Bank (UK)</span>
+                    <span className="font-semibold text-white">{settings.clearingBankName || 'Aegis Clearing Bank (UK)'}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
-                    <span className="text-slate-400">Headquarters Address:</span>
-                    <span className="font-semibold text-white">Aegis Financial Center, London EC2M, UK</span>
+                    <span className="text-slate-400">Beneficiary Name:</span>
+                    <span className="font-semibold text-white">{settings.clearingBankAccountName || 'Aegis Global Clearing Treasury'}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5 border-b border-[#002d57]">
+                    <span className="text-slate-400">Clearing IBAN / Account:</span>
+                    <span className="font-mono font-semibold text-cyan-300">{settings.clearingBankAccountNumber || 'GB82 AEGS 2000 0084 9201 84'}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
                     <span className="text-slate-400">SWIFT / BIC Code:</span>
-                    <span className="font-mono font-bold text-cyan-300">AEGSGB2L</span>
-                  </div>
-                  <div className="flex justify-between py-1.5 border-b border-[#002d57]">
-                    <span className="text-slate-400">Sort Code:</span>
-                    <span className="font-mono font-semibold text-white">20-00-00</span>
+                    <span className="font-mono font-bold text-cyan-300">{settings.clearingSwiftCode || 'AEGSGB2L'}</span>
                   </div>
                   <div className="flex justify-between py-1.5 border-b border-[#002d57]">
                     <span className="text-slate-400">Your Target Account Number:</span>
@@ -324,14 +312,13 @@ export const DepositModal: React.FC<DepositModalProps> = ({
         </div>
       </div>
 
-      {/* "I Have Made the Payment" Modal (Requirement 6) */}
       {showProofModal && (
         <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-md animate-in fade-in duration-200">
           <div className="relative w-full max-w-md bg-[#001933] border border-cyan-500/50 rounded-2xl shadow-2xl p-6 text-white">
             <div className="flex items-center justify-between pb-3 border-b border-[#002c59]">
               <div>
                 <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">
-                  Payment Verification
+                  Deposit Verification
                 </span>
                 <h4 className="text-base font-extrabold text-white">Submit Proof of Payment</h4>
               </div>
@@ -348,9 +335,9 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                 <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center border border-emerald-400/40">
                   <CheckCircle2 className="w-8 h-8 animate-bounce" />
                 </div>
-                <h5 className="text-lg font-bold text-white">Proof Submitted Successfully!</h5>
+                <h5 className="text-lg font-bold text-white">Deposit Request Saved!</h5>
                 <p className="text-xs text-slate-300">
-                  Your payment submission is now <strong>Pending</strong> in the Aegis Review queue. You will receive an instant notification once approved and credited.
+                  Your deposit is now marked <strong>Pending</strong> in Cloud Firestore. You will be notified as soon as an authorized administrator reviews and approves it.
                 </p>
               </div>
             ) : (
@@ -389,7 +376,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     type="text"
                     value={proofTxHash}
                     onChange={(e) => setProofTxHash(e.target.value)}
-                    placeholder="e.g. 0x8f2a... or blockchain tx hash"
+                    placeholder="e.g. 0x8f2a... or bank wire ref"
                     className="w-full bg-[#002244] border border-[#003866] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-400 font-mono focus:outline-none focus:border-cyan-400"
                     required
                   />
@@ -397,15 +384,20 @@ export const DepositModal: React.FC<DepositModalProps> = ({
 
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">
-                    Upload Proof of Payment (Screenshot / Receipt Image)
+                    Upload Proof of Payment (Firebase Storage)
                   </label>
                   <div className="border-2 border-dashed border-[#003866] rounded-xl p-3 text-center bg-[#001326] hover:border-cyan-400 transition-colors">
-                    {proofImage ? (
+                    {uploadingProof ? (
+                      <div className="py-4 flex flex-col items-center gap-2 text-cyan-400">
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                        <span className="text-xs font-medium">Uploading to Firebase Storage...</span>
+                      </div>
+                    ) : proofImage ? (
                       <div className="relative">
-                        <img 
-                          src={proofImage} 
-                          alt="Proof preview" 
-                          className="max-h-28 mx-auto rounded object-contain border border-[#002b52]" 
+                        <img
+                          src={proofImage}
+                          alt="Proof preview"
+                          className="max-h-28 mx-auto rounded object-contain border border-[#002b52]"
                         />
                         <button
                           type="button"
@@ -419,7 +411,7 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                       <label className="cursor-pointer block">
                         <Upload className="w-6 h-6 text-cyan-400 mx-auto mb-1" />
                         <span className="text-xs text-slate-300 font-medium">Click to upload transfer screenshot</span>
-                        <p className="text-[10px] text-slate-400">PNG, JPG, or PDF up to 2MB</p>
+                        <p className="text-[10px] text-slate-400">PNG or JPG up to 5MB</p>
                         <input
                           type="file"
                           accept="image/*"
@@ -439,17 +431,17 @@ export const DepositModal: React.FC<DepositModalProps> = ({
                     type="text"
                     value={proofNotes}
                     onChange={(e) => setProofNotes(e.target.value)}
-                    placeholder="e.g. Deposited from Binance wallet"
+                    placeholder="e.g. Deposited from Coinbase wallet"
                     className="w-full bg-[#002244] border border-[#003866] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-cyan-400"
                   />
                 </div>
 
                 <button
                   type="submit"
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || uploadingProof}
                   className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-slate-950 font-bold text-xs tracking-wide shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Transmitting Proof...' : 'Submit Proof for Aegis Review'}
+                  {isSubmitting ? 'Saving Deposit Request...' : 'Submit Deposit for Review'}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>

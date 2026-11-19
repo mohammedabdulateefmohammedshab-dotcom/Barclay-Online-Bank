@@ -14,6 +14,7 @@ import {
 import { UserProfile } from '../types';
 import { LANGUAGES, SupportedLanguage, TRANSLATIONS } from '../lib/languages';
 import { BrandLogo } from './BrandLogo';
+import { store } from '../lib/store';
 
 interface HeaderProps {
   currentUser: UserProfile | null;
@@ -206,8 +207,18 @@ export const Header: React.FC<HeaderProps> = ({
                   onClick={() => setUserMenuOpen(!userMenuOpen)}
                   className="flex items-center gap-2 bg-[#141824] hover:bg-[#1a1f2e] border border-white/10 px-3 py-1.5 rounded-lg text-left transition-colors cursor-pointer"
                 >
-                  <div className="w-7 h-7 rounded-full bg-gradient-to-r from-[#2176ff] to-[#7c3aed] text-white font-bold text-xs flex items-center justify-center shrink-0">
-                    {currentUser.fullName.charAt(0)}{currentUser.surname.charAt(0)}
+                  <div className="w-7 h-7 rounded-full bg-gradient-to-r from-[#2176ff] to-[#7c3aed] text-white font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                    {currentUser.photoUrl ? (
+                      <img
+                        src={currentUser.photoUrl}
+                        alt={currentUser.fullName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <>
+                        {currentUser.fullName.charAt(0)}{currentUser.surname.charAt(0)}
+                      </>
+                    )}
                   </div>
                   <div className="hidden sm:block">
                     <p className="text-xs font-bold leading-tight text-white whitespace-nowrap">{currentUser.fullName}</p>
@@ -269,7 +280,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <span>24/7 Support</span>
                     </button>
 
-                    {currentUser.role === 'admin' && (
+                    {(currentUser.role === 'admin' || store.isCurrentUserAdmin()) && (
                       <button
                         type="button"
                         onClick={() => {
@@ -348,7 +359,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {currentUser?.role === 'admin' && (
+          {(currentUser?.role === 'admin' || store.isCurrentUserAdmin()) && (
             <button
               type="button"
               onClick={() => {

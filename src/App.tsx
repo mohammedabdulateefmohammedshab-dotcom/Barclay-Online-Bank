@@ -1,12 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { store } from './lib/store';
-import { 
-  UserProfile, 
-  BankTransaction, 
-  PaymentSubmission, 
-  VerificationRequest, 
-  BankNotification, 
-  FinancialSettings 
+import {
+  UserProfile,
+  BankTransaction,
+  DepositRecord,
+  WithdrawalRecord,
+  PaymentSubmission,
+  VerificationRequest,
+  BankNotification,
+  FinancialSettings,
+  InvestmentPlan,
+  UserInvestment,
+  ReferralRecord,
+  AdminRoleRecord,
+  BankingPaymentInfo,
+  AdminTier,
 } from './types';
 import { SupportedLanguage } from './lib/languages';
 import { Header } from './components/Header';
@@ -24,18 +32,33 @@ import { SupportModal } from './components/SupportModal';
 import { AboutModal } from './components/AboutModal';
 import { LiveChatWidget } from './components/LiveChatWidget';
 import { testConnection } from './lib/firebase';
+import { BrandLogo } from './components/BrandLogo';
 
 export default function App() {
-  // Global Store State
+  const [authReady, setAuthReady] = useState<boolean>(store.isAuthReady());
   const [users, setUsers] = useState<UserProfile[]>(store.getUsers());
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(store.getCurrentUser());
+  const [adminTier, setAdminTier] = useState<AdminTier | null>(store.getCurrentAdminTier());
+  const [admins, setAdmins] = useState<AdminRoleRecord[]>(store.getAdmins());
   const [transactions, setTransactions] = useState<BankTransaction[]>(store.getTransactions());
-  const [paymentSubmissions, setPaymentSubmissions] = useState<PaymentSubmission[]>(store.getPaymentSubmissions());
-  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>(store.getVerificationRequests());
+  const [deposits, setDeposits] = useState<DepositRecord[]>(store.getDeposits());
+  const [withdrawals, setWithdrawals] = useState<WithdrawalRecord[]>(store.getWithdrawals());
+  const [paymentSubmissions, setPaymentSubmissions] = useState<PaymentSubmission[]>(
+    store.getPaymentSubmissions()
+  );
+  const [verificationRequests, setVerificationRequests] = useState<VerificationRequest[]>(
+    store.getVerificationRequests()
+  );
+  const [investmentPlans, setInvestmentPlans] = useState<InvestmentPlan[]>(
+    store.getInvestmentPlans()
+  );
+  const [investments, setInvestments] = useState<UserInvestment[]>(store.getInvestments());
+  const [referrals, setReferrals] = useState<ReferralRecord[]>(store.getReferrals());
+  const [bankingInfos, setBankingInfos] = useState<BankingPaymentInfo[]>(store.getAllBankingInfos());
   const [notifications, setNotifications] = useState<BankNotification[]>(store.getNotifications());
   const [settings, setSettings] = useState<FinancialSettings>(store.getSettings());
 
-  // Navigation & View Mode: Persistent across page refreshes per Requirement 3
+  // Navigation & View Mode: Persistent across page refreshes
   const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>(() => {
     const saved = typeof window !== 'undefined' ? sessionStorage.getItem('aegis_active_tab') : null;
     if (saved === 'dashboard') return 'dashboard';
@@ -46,9 +69,7 @@ export default function App() {
   const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const savedAdmin = sessionStorage.getItem('aegis_management_active') === 'true';
-      const initUser = store.getCurrentUser();
-      const isRoleAdmin = initUser?.role === 'admin' || initUser?.email === 'newzelebarclaysupport@gmail.com';
-      return savedAdmin || isRoleAdmin;
+      return savedAdmin && store.isCurrentUserAdmin();
     }
     return false;
   });
@@ -67,33 +88,67 @@ export default function App() {
   const [aboutModalOpen, setAboutModalOpen] = useState(false);
   const [selectedReceiptTx, setSelectedReceiptTx] = useState<BankTransaction | null>(null);
 
-  // Subscribe to real-time store updates
+  // Subscribe to real-time store & Firebase Auth persistence updates
   useEffect(() => {
-    testConnection(); // Probe connection
-    const unsubscribe = store.subscribe(() => {
-      setUsers(store.getUsers());
+    testConnection();
+    const syncState = () => {
+      const ready = store.isAuthReady();
       const u = store.getCurrentUser();
+      const tier = store.getCurrentAdminTier();
+      const hasAdminAccess = store.isCurrentUserAdmin() || u?.role === 'admin';
+
+      setAuthReady(ready);
+      setUsers(store.getUsers());
       setCurrentUser(u);
+      setAdminTier(tier);
+      setAdmins(store.getAdmins());
       setTransactions(store.getTransactions());
+      setDeposits(store.getDeposits());
+      setWithdrawals(store.getWithdrawals());
       setPaymentSubmissions(store.getPaymentSubmissions());
       setVerificationRequests(store.getVerificationRequests());
+      setInvestmentPlans(store.getInvestmentPlans());
+      setInvestments(store.getInvestments());
+      setReferrals(store.getReferrals());
+      setBankingInfos(store.getAllBankingInfos());
       setNotifications(store.getNotifications());
       setSettings(store.getSettings());
-      if (u && (u.role === 'admin' || u.email === 'newzelebarclaysupport@gmail.com')) {
-        setIsAdminMode(true);
-        sessionStorage.setItem('aegis_management_active', 'true');
+
+      if (ready && !u) {
+        setIsAdminMode(false);
+        sessionStorage.removeItem('aegis_management_active');
+      } else if (u && hasAdminAccess) {
+        if (sessionStorage.getItem('aegis_management_active') === 'true' || !sessionStorage.getItem('aegis_active_tab')) {
+          setIsAdminMode(true);
+          sessionStorage.setItem('aegis_management_active', 'true');
+        }
+      } else if (u && !hasAdminAccess) {
+        setIsAdminMode(false);
+        sessionStorage.removeItem('aegis_management_active');
+        if (sessionStorage.getItem('aegis_active_tab') !== 'home') {
+          setActiveTab('dashboard');
+          sessionStorage.setItem('aegis_active_tab', 'dashboard');
+        }
       }
-    });
+    };
+
+    syncState();
+    const unsubscribe = store.subscribe(syncState);
     return unsubscribe;
   }, []);
 
-  // Route listener: direct route to unified login or management if hash matches
+  // Route listener for direct admin route hash
   useEffect(() => {
     const checkAdminRoute = () => {
       const hash = window.location.hash.toLowerCase();
-      if (hash === '#admin' || hash === '#/admin' || hash === '#portal' || window.location.search.includes('admin=true')) {
+      if (
+        hash === '#admin' ||
+        hash === '#/admin' ||
+        hash === '#portal' ||
+        window.location.search.includes('admin=true')
+      ) {
         const u = store.getCurrentUser();
-        if (u && (u.role === 'admin' || u.email === 'newzelebarclaysupport@gmail.com')) {
+        if (u && (store.isCurrentUserAdmin() || u.role === 'admin')) {
           setIsAdminMode(true);
           sessionStorage.setItem('aegis_management_active', 'true');
         } else {
@@ -110,27 +165,40 @@ export default function App() {
     };
   }, []);
 
-  // Filter current user's transactions and notifications
-  const userTransactions = currentUser 
-    ? transactions.filter(t => t.userId === currentUser.uid)
+  const userTransactions = currentUser
+    ? transactions.filter((t) => t.userId === currentUser.uid)
     : [];
-
+  const userDeposits = currentUser
+    ? deposits.filter((d) => d.userId === currentUser.uid)
+    : [];
+  const userWithdrawals = currentUser
+    ? withdrawals.filter((w) => w.userId === currentUser.uid)
+    : [];
+  const userInvestments = currentUser
+    ? investments.filter((i) => i.userId === currentUser.uid)
+    : [];
+  const userReferrals = currentUser
+    ? referrals.filter(
+        (r) => r.referrerUid === currentUser.uid || r.referredUid === currentUser.uid
+      )
+    : [];
   const userNotifications = currentUser
-    ? notifications.filter(n => n.userId === currentUser.uid)
+    ? notifications.filter((n) => n.userId === currentUser.uid)
     : [];
 
-  const unreadCount = userNotifications.filter(n => !n.read).length;
+  const unreadCount = userNotifications.filter((n) => !n.read).length;
 
   const handleOpenAuth = (mode: 'login' | 'register' | 'forgot') => {
     setAuthInitialMode(mode);
     setAuthModalOpen(true);
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     sessionStorage.removeItem('aegis_active_tab');
     sessionStorage.removeItem('aegis_management_active');
-    store.setCurrentUserId(null);
+    await store.logoutUser();
     setCurrentUser(null);
+    setAdminTier(null);
     setActiveTab('home');
     setIsAdminMode(false);
   };
@@ -143,16 +211,32 @@ export default function App() {
     setSelectedReceiptTx(tx);
   };
 
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-[#0b0d13] text-white flex flex-col items-center justify-center gap-4">
+        <BrandLogo variant="emblem" size="md" theme="dark" />
+        <div className="w-8 h-8 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-mono text-slate-400 tracking-wider uppercase">
+          Restoring Secure Session...
+        </p>
+      </div>
+    );
+  }
+
+  const canAccessAdmin = Boolean(
+    currentUser && (store.isCurrentUserAdmin() || currentUser.role === 'admin')
+  );
+
   return (
     <div className="min-h-screen bg-[#0b0d13] font-sans antialiased text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
-      
       {/* Universal Header */}
       <Header
         currentUser={currentUser}
-        isAdminMode={isAdminMode}
+        isAdminMode={isAdminMode && canAccessAdmin}
         onOpenAuth={handleOpenAuth}
         onLogout={handleLogout}
         onToggleAdminView={() => {
+          if (!canAccessAdmin) return;
           setIsAdminMode(true);
           sessionStorage.setItem('aegis_management_active', 'true');
         }}
@@ -162,37 +246,49 @@ export default function App() {
         onChangeLang={setCurrentLang}
         onOpenAbout={() => setAboutModalOpen(true)}
         onOpenSupport={() => setSupportModalOpen(true)}
-        activeTab={isAdminMode ? 'admin' : activeTab}
+        activeTab={isAdminMode && canAccessAdmin ? 'admin' : activeTab}
         onSelectTab={(tab) => {
           setIsAdminMode(false);
           sessionStorage.removeItem('aegis_management_active');
-          setActiveTab(tab as any);
+          setActiveTab(tab as 'home' | 'dashboard');
           sessionStorage.setItem('aegis_active_tab', tab);
         }}
       />
 
       {/* Main Content Area */}
       <main className="flex-1">
-        {isAdminMode ? (
-          /* Separate Secure Admin Dashboard (Requirement 3 & 4: Only authorized administrators) */
+        {isAdminMode && canAccessAdmin ? (
           <AdminDashboard
             users={users}
             transactions={transactions}
+            deposits={deposits}
+            withdrawals={withdrawals}
             paymentSubmissions={paymentSubmissions}
             verificationRequests={verificationRequests}
+            investmentPlans={investmentPlans}
+            investments={investments}
+            referrals={referrals}
+            admins={admins}
+            bankingInfos={bankingInfos}
+            adminTier={adminTier || currentUser?.adminTier || 'tier1'}
             settings={settings}
             onViewReceipt={(tx) => setSelectedReceiptTx(tx)}
             onExitAdmin={() => {
               sessionStorage.removeItem('aegis_management_active');
               setIsAdminMode(false);
-              setActiveTab('home');
+              setActiveTab(currentUser ? 'dashboard' : 'home');
+              sessionStorage.setItem('aegis_active_tab', currentUser ? 'dashboard' : 'home');
             }}
           />
         ) : currentUser && activeTab === 'dashboard' ? (
-          /* Registered User Dashboard (Requirement 2 & 5) */
           <UserDashboard
             currentUser={currentUser}
             transactions={userTransactions}
+            deposits={userDeposits}
+            withdrawals={userWithdrawals}
+            investmentPlans={investmentPlans}
+            investments={userInvestments}
+            referrals={userReferrals}
             settings={settings}
             onOpenDeposit={() => setDepositModalOpen(true)}
             onOpenTransfer={() => setTransferModalOpen(true)}
@@ -204,7 +300,6 @@ export default function App() {
             onLogout={handleLogout}
           />
         ) : (
-          /* Website Public Homepage (Requirement 1 & 2: First landing screen) */
           <HomePage
             onOpenAuth={handleOpenAuth}
             onOpenAbout={() => setAboutModalOpen(true)}
@@ -214,7 +309,7 @@ export default function App() {
         )}
       </main>
 
-      {/* User Login & Registration Modal - Unified for both Customers and Administrators */}
+      {/* Unified User & Admin Login / Registration Modal */}
       <AuthModal
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
@@ -222,7 +317,7 @@ export default function App() {
         onSuccess={(user) => {
           store.setCurrentUserId(user.uid);
           setCurrentUser(user);
-          if (user.role === 'admin' || user.email === 'newzelebarclaysupport@gmail.com') {
+          if (store.isCurrentUserAdmin() || user.role === 'admin') {
             setIsAdminMode(true);
             sessionStorage.setItem('aegis_management_active', 'true');
             sessionStorage.removeItem('aegis_active_tab');
@@ -276,13 +371,13 @@ export default function App() {
         </>
       )}
 
-      {/* Receipts viewable by both customer and admin */}
+      {/* Receipts */}
       <TransactionReceiptModal
         transaction={selectedReceiptTx}
         onClose={() => setSelectedReceiptTx(null)}
       />
 
-      {/* Customer Support Modal */}
+      {/* Support Modal */}
       <SupportModal
         isOpen={supportModalOpen}
         onClose={() => setSupportModalOpen(false)}
@@ -290,14 +385,11 @@ export default function App() {
         accountNumber={currentUser?.accountNumber}
       />
 
-      {/* About Us Modal */}
-      <AboutModal
-        isOpen={aboutModalOpen}
-        onClose={() => setAboutModalOpen(false)}
-      />
+      {/* About Modal */}
+      <AboutModal isOpen={aboutModalOpen} onClose={() => setAboutModalOpen(false)} />
 
-      {/* Floating 24/7 Live Support Chat (Only displayed outside admin dashboard) */}
-      {!isAdminMode && (
+      {/* Live Support Chat (outside Admin Portal) */}
+      {!(isAdminMode && canAccessAdmin) && (
         <LiveChatWidget
           currentUser={currentUser}
           onOpenAuth={() => handleOpenAuth('login')}

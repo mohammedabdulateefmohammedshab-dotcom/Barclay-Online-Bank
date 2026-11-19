@@ -1,18 +1,18 @@
 import React, { useState, useRef } from 'react';
-import { 
-  X, 
-  ShieldCheck, 
-  Camera, 
-  Upload, 
-  CheckCircle2, 
-  AlertCircle, 
-  Sparkles, 
-  FileText, 
+import {
+  X,
+  Camera,
+  Upload,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
   ArrowRight,
-  UserCheck
+  UserCheck,
+  Loader2
 } from 'lucide-react';
 import { UserProfile, FinancialSettings } from '../types';
 import { store } from '../lib/store';
+import { uploadMediaFile } from '../lib/firebase';
 import { BrandLogo } from './BrandLogo';
 
 interface TierUpgradeModalProps {
@@ -32,11 +32,11 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
     currentUser.tier === 'Tier 1' ? 'Tier 2' : 'Tier 3'
   );
   const [mediaData, setMediaData] = useState<string>('');
+  const [uploadingMedia, setUploadingMedia] = useState(false);
   const [documentType, setDocumentType] = useState('Passport');
   const [documentNumber, setDocumentNumber] = useState('');
   const [notes, setNotes] = useState('');
-  
-  // Camera simulation or live capture
+
   const [useCamera, setUseCamera] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -46,19 +46,23 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 3 * 1024 * 1024) {
-        setErrorMessage('File size must be less than 3MB.');
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setMediaData(reader.result as string);
-        setErrorMessage('');
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('File size must be less than 5MB.');
+      return;
+    }
+
+    setUploadingMedia(true);
+    setErrorMessage('');
+    try {
+      const res = await uploadMediaFile(file, `kyc_docs/${currentUser.uid}`);
+      setMediaData(res.url);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to upload verification document.');
+    } finally {
+      setUploadingMedia(false);
     }
   };
 
@@ -70,7 +74,7 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-    } catch (err) {
+    } catch {
       setErrorMessage('Camera access was not granted or is not available. Please upload a clear photo instead.');
       setUseCamera(false);
     }
@@ -84,10 +88,21 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg');
-        setMediaData(dataUrl);
+        canvas.toBlob(async (blob) => {
+          if (blob) {
+            const file = new File([blob], `biometric_${Date.now()}.jpg`, { type: 'image/jpeg' });
+            setUploadingMedia(true);
+            try {
+              const res = await uploadMediaFile(file, `kyc_docs/${currentUser.uid}`);
+              setMediaData(res.url);
+            } catch {
+              setMediaData(canvas.toDataURL('image/jpeg', 0.8));
+            } finally {
+              setUploadingMedia(false);
+            }
+          }
+        }, 'image/jpeg', 0.82);
       }
-      // Stop video tracks
       const stream = videoRef.current.srcObject as MediaStream;
       stream?.getTracks().forEach(t => t.stop());
       setUseCamera(false);
@@ -100,7 +115,7 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
 
     if (!mediaData) {
       setErrorMessage(
-        selectedTargetTier === 'Tier 2' 
+        selectedTargetTier === 'Tier 2'
           ? 'Please capture or upload a clear biometric photograph of your face.'
           : 'Please upload a photograph or scan of your government-issued ID.'
       );
@@ -135,14 +150,13 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
     }
   };
 
-  const currentFee = selectedTargetTier === 'Tier 2' 
-    ? settings.tier2UpgradeFee 
+  const currentFee = selectedTargetTier === 'Tier 2'
+    ? settings.tier2UpgradeFee
     : settings.tier3UpgradeFee;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="relative w-full max-w-lg bg-[#00172e] border border-[#003866] rounded-2xl shadow-2xl overflow-hidden text-white">
-        
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#002b52] flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -162,10 +176,8 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
           </button>
         </div>
 
-        {/* Tier Overview Cards */}
         <div className="p-6 max-h-[75vh] overflow-y-auto space-y-4">
           <div className="grid grid-cols-2 gap-3">
-            {/* Tier 2 Option */}
             <button
               type="button"
               onClick={() => setSelectedTargetTier('Tier 2')}
@@ -190,7 +202,6 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
               </div>
             </button>
 
-            {/* Tier 3 Option */}
             <button
               type="button"
               onClick={() => setSelectedTargetTier('Tier 3')}
@@ -223,7 +234,7 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
               </div>
               <h5 className="text-lg font-bold text-white">Verification Submitted!</h5>
               <p className="text-xs text-slate-300">
-                Your request has been placed in the Administrator compliance queue with status: <strong>Pending Review</strong>. Your account will automatically upgrade upon approval.
+                Your request has been placed in the Administrator compliance queue with status: <strong>Pending Review</strong>.
               </p>
             </div>
           ) : (
@@ -235,18 +246,16 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
                 </div>
               )}
 
-              {/* Tier 2: Facial Verification Requirements */}
               {selectedTargetTier === 'Tier 2' ? (
                 <div className="p-4 rounded-xl bg-[#001f3d] border border-[#003866] space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-cyan-300">
                     <UserCheck className="w-4 h-4" />
-                    <span>Facial Photograph Capture / Upload</span>
+                    <span>Facial Photograph Capture / Upload (Firebase Storage)</span>
                   </div>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Please upload or capture a clear photo of your face looking directly into the camera. No sunglasses or hats.
+                    Please upload or capture a clear photo of your face looking directly into the camera.
                   </p>
 
-                  {/* Camera view */}
                   {useCamera ? (
                     <div className="space-y-2">
                       <div className="rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
@@ -268,6 +277,11 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
                           Cancel
                         </button>
                       </div>
+                    </div>
+                  ) : uploadingMedia ? (
+                    <div className="p-6 text-center text-cyan-400 flex flex-col items-center gap-2 bg-[#001326] rounded-xl border border-cyan-500/30">
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <span className="text-xs">Uploading to Firebase Storage...</span>
                     </div>
                   ) : mediaData ? (
                     <div className="relative p-2 bg-[#001326] rounded-xl border border-cyan-500/50">
@@ -307,7 +321,6 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
                   )}
                 </div>
               ) : (
-                /* Tier 3: Government ID Requirements */
                 <div className="p-4 rounded-xl bg-[#001f3d] border border-[#003866] space-y-3">
                   <div className="flex items-center gap-2 text-xs font-bold text-amber-300">
                     <FileText className="w-4 h-4" />
@@ -347,7 +360,12 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
                     </div>
                   </div>
 
-                  {mediaData ? (
+                  {uploadingMedia ? (
+                    <div className="p-6 text-center text-amber-400 flex flex-col items-center gap-2 bg-[#001326] rounded-xl border border-amber-500/30">
+                      <Loader2 className="w-6 h-6 animate-spin" />
+                      <span className="text-xs">Uploading to Firebase Storage...</span>
+                    </div>
+                  ) : mediaData ? (
                     <div className="relative p-2 bg-[#001326] rounded-xl border border-amber-500/50">
                       <img src={mediaData} alt="ID Document" className="max-h-40 mx-auto rounded object-contain" />
                       <button
@@ -362,7 +380,7 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
                     <label className="cursor-pointer block border-2 border-dashed border-[#004080] rounded-xl p-4 text-center bg-[#001326] hover:border-amber-400 transition-colors">
                       <Upload className="w-6 h-6 text-amber-400 mx-auto mb-1" />
                       <span className="text-xs text-white font-semibold">Click to upload document photo or scan</span>
-                      <p className="text-[10px] text-slate-400">High resolution image under 3MB</p>
+                      <p className="text-[10px] text-slate-400">High resolution image under 5MB</p>
                       <input
                         type="file"
                         accept="image/*"
@@ -374,7 +392,19 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
                 </div>
               )}
 
-              {/* Upgrade fee note */}
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-300 mb-1">
+                  Compliance Notes (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Optional verification notes..."
+                  className="w-full bg-[#001326] border border-[#003866] rounded-lg px-3 py-1.5 text-xs text-white"
+                />
+              </div>
+
               <div className="p-3 rounded-lg bg-[#001326] border border-[#002447] flex items-center justify-between text-xs">
                 <span className="text-slate-400">Configured Upgrade Processing Fee:</span>
                 <span className="font-bold text-emerald-400">${currentFee.toLocaleString()} USD</span>
@@ -382,7 +412,7 @@ export const TierUpgradeModal: React.FC<TierUpgradeModalProps> = ({
 
               <button
                 type="submit"
-                disabled={loading || !mediaData}
+                disabled={loading || uploadingMedia || !mediaData}
                 className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-cyan-400 to-blue-500 hover:from-cyan-300 hover:to-blue-400 text-slate-950 font-bold text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition-all disabled:opacity-40"
               >
                 {loading ? 'Submitting to Compliance Queue...' : `Submit for ${selectedTargetTier} Review`}
