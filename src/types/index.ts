@@ -2,6 +2,8 @@ export type AccountTier = 'Tier 1' | 'Tier 2' | 'Tier 3';
 
 export type AdminTier = 'tier1' | 'tier2';
 
+export type AuthRole = 'CUSTOMER' | 'ADMIN' | 'SUPER_ADMIN';
+
 export type TransactionType =
   | 'deposit'
   | 'withdrawal'

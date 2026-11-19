@@ -15,6 +15,7 @@ import {
   AdminRoleRecord,
   BankingPaymentInfo,
   AdminTier,
+  AuthRole,
 } from './types';
 import { SupportedLanguage } from './lib/languages';
 import { Header } from './components/Header';
@@ -168,7 +169,7 @@ export default function App() {
         if (
           sessionStorage.getItem('aegis_management_active') === 'true' ||
           isAdminRouteUrl() ||
-          !u
+          sessionStorage.getItem('aegis_active_tab') === null
         ) {
           setIsAdminMode(true);
           sessionStorage.setItem('aegis_management_active', 'true');
@@ -276,6 +277,52 @@ export default function App() {
   const canAccessAdmin = Boolean(
     activeAdmin || store.isCurrentUserAdmin() || currentUser?.role === 'admin'
   );
+
+  // Access Denied guard if an authenticated normal CUSTOMER attempts to visit /admin (preserves their session)
+  if (isAdminRoute && currentUser && !canAccessAdmin) {
+    return (
+      <div className="min-h-screen bg-[#050811] text-white flex flex-col items-center justify-center p-6">
+        <div className="max-w-md w-full bg-[#0b1120] border border-rose-500/30 rounded-3xl p-7 text-center space-y-4 shadow-2xl">
+          <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-400 mx-auto flex items-center justify-center font-black text-lg">
+            403
+          </div>
+          <h1 className="text-xl font-black text-white">Access Denied</h1>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            Your signed-in account (<span className="font-mono text-white">{currentUser.email}</span>) has{' '}
+            <span className="font-bold text-blue-300">CUSTOMER</span> permissions and is not authorized to access the Aegis Admin Portal. Your banking session has been preserved.
+          </p>
+          <div className="pt-2 space-y-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                clearAdminRouteUrl();
+                setIsAdminRoute(false);
+                setIsAdminMode(false);
+                setActiveTab('dashboard');
+                sessionStorage.setItem('aegis_active_tab', 'dashboard');
+              }}
+              className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-[#2176ff] via-[#4f46e5] to-[#7c3aed] text-white font-bold text-xs tracking-wide cursor-pointer"
+            >
+              Return to My Customer Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await store.logoutUser();
+                setCurrentUser(null);
+                setActiveAdmin(null);
+                setAdminTier(null);
+                setIsAdminMode(false);
+              }}
+              className="w-full py-2.5 px-4 rounded-xl bg-[#11192d] hover:bg-[#18223d] border border-white/10 text-slate-300 font-semibold text-xs cursor-pointer"
+            >
+              Sign Out &amp; Switch to Administrator Account
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Dedicated standalone Admin Login Page when accessing /admin or #/admin while unauthenticated
   if (isAdminRoute && !canAccessAdmin) {
@@ -400,7 +447,7 @@ export default function App() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         initialMode={authInitialMode}
-        onSuccess={(user, adminRecord) => {
+        onSuccess={(user, adminRecord, role?: AuthRole) => {
           if (adminRecord) setActiveAdmin(adminRecord);
           if (user) {
             store.setCurrentUserId(user.uid);
@@ -408,7 +455,14 @@ export default function App() {
           } else if (adminRecord) {
             store.setCurrentUserId(adminRecord.uid);
           }
-          if (adminRecord || store.isCurrentUserAdmin() || user?.role === 'admin') {
+          const isAdminRole =
+            role === 'SUPER_ADMIN' ||
+            role === 'ADMIN' ||
+            Boolean(adminRecord) ||
+            store.isCurrentUserAdmin() ||
+            user?.role === 'admin';
+
+          if (isAdminRole) {
             setAdminTier(adminRecord?.tier || store.getCurrentAdminTier() || 'tier1');
             setIsAdminMode(true);
             sessionStorage.setItem('aegis_management_active', 'true');

@@ -44,6 +44,7 @@ import {
   SupportConversation,
   PaymentMethod,
   AdminTier,
+  AuthRole,
   AdminRoleRecord,
   InvestmentPlan,
   UserInvestment,
@@ -616,6 +617,17 @@ class AegisStore {
     return this.currentAdminTier;
   }
 
+  public getCurrentAuthRole(): AuthRole | null {
+    if (!this.currentUserId && !this.currentAdminTier) return null;
+    if (this.currentAdminTier === 'tier1') return 'SUPER_ADMIN';
+    if (this.currentAdminTier === 'tier2') return 'ADMIN';
+    const user = this.getCurrentUser();
+    if (user?.role === 'admin') {
+      return user.adminTier === 'tier1' ? 'SUPER_ADMIN' : 'ADMIN';
+    }
+    return user ? 'CUSTOMER' : null;
+  }
+
   public isCurrentUserAdmin(): boolean {
     return this.currentAdminTier === 'tier1' || this.currentAdminTier === 'tier2';
   }
@@ -1061,7 +1073,12 @@ class AegisStore {
   public async loginUser(
     identifier: string,
     secret: string
-  ): Promise<{ user: UserProfile | null; adminRecord?: AdminRoleRecord | null; error?: string }> {
+  ): Promise<{
+    user: UserProfile | null;
+    adminRecord?: AdminRoleRecord | null;
+    role?: AuthRole;
+    error?: string;
+  }> {
     const trimmed = identifier.trim();
     const cleanSecret = secret.trim();
 
@@ -1096,10 +1113,19 @@ class AegisStore {
         this.subscribeCustomerCollections(profile);
       }
 
+      const resolvedRole: AuthRole =
+        this.currentAdminTier === 'tier1'
+          ? 'SUPER_ADMIN'
+          : this.currentAdminTier === 'tier2'
+            ? 'ADMIN'
+            : profile?.role === 'admin'
+              ? 'ADMIN'
+              : 'CUSTOMER';
+
       this.notify();
-      return { user: profile, adminRecord };
+      return { user: profile, adminRecord, role: resolvedRole };
     } catch (err: any) {
-      let msg = 'Invalid credentials. Please verify your identifier and password.';
+      let msg = 'Invalid email or password. Please verify your credentials and try again.';
       if (err?.code === 'auth/operation-not-allowed') {
         msg =
           'Email/Password sign-in is disabled in Firebase Console for this project. Enable Authentication > Sign-in method > Email/Password in Firebase Console.';
@@ -1110,8 +1136,7 @@ class AegisStore {
         err?.code === 'auth/wrong-password' ||
         err?.code === 'auth/user-not-found'
       ) {
-        msg =
-          'Invalid email or password, or your administrator password has not been set up yet.';
+        msg = 'Invalid email or password. Please verify your credentials and try again.';
       }
       return { user: null, error: msg };
     }
@@ -1123,7 +1148,12 @@ class AegisStore {
   public async verifyAdminLogin(
     emailOrId: string,
     password: string
-  ): Promise<{ adminRecord?: AdminRoleRecord | null; adminUser?: UserProfile | null; error?: string }> {
+  ): Promise<{
+    adminRecord?: AdminRoleRecord | null;
+    adminUser?: UserProfile | null;
+    role?: AuthRole;
+    error?: string;
+  }> {
     const res = await this.loginUser(emailOrId, password);
     if (res.error) {
       return { error: res.error };
@@ -1137,6 +1167,7 @@ class AegisStore {
     return {
       adminRecord: res.adminRecord || this.currentAdminRecord,
       adminUser: res.user,
+      role: res.role,
     };
   }
 
