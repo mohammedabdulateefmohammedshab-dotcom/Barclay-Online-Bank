@@ -25,7 +25,8 @@ import {
   UserPlus,
   Plus,
   Power,
-  Ban
+  Ban,
+  LogOut
 } from 'lucide-react';
 import {
   UserProfile,
@@ -61,9 +62,11 @@ interface AdminDashboardProps {
   admins: AdminRoleRecord[];
   bankingInfos: BankingPaymentInfo[];
   adminTier: AdminTier | null;
+  activeAdmin?: AdminRoleRecord | null;
   settings: FinancialSettings;
   onViewReceipt: (tx: BankTransaction) => void;
   onExitAdmin: () => void;
+  onLogout?: () => void;
 }
 
 type AdminTab =
@@ -92,13 +95,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   admins,
   bankingInfos,
   adminTier,
+  activeAdmin,
   settings,
   onViewReceipt,
   onExitAdmin,
+  onLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('search');
   const currentAdmin = store.getCurrentUser();
   const isTier1 = adminTier === 'tier1';
+  const customerUsers = useMemo(() => users.filter((u) => u.role !== 'admin'), [users]);
 
   // Global action banner feedback
   const [actionBanner, setActionBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -109,7 +115,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   // Search state
   const [searchAccountInput, setSearchAccountInput] = useState('');
-  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(users[0] || null);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(customerUsers[0] || null);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>(store.getAuditLogs());
   const [auditFilter, setAuditFilter] = useState('');
   const [suspensionConfirm, setSuspensionConfirm] = useState(false);
@@ -171,12 +177,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   useEffect(() => {
     if (selectedUser) {
-      const updated = users.find((u) => u.uid === selectedUser.uid);
+      const updated = customerUsers.find((u) => u.uid === selectedUser.uid);
       if (updated) setSelectedUser(updated);
-    } else if (users.length > 0) {
-      setSelectedUser(users[0]);
+    } else if (customerUsers.length > 0) {
+      setSelectedUser(customerUsers[0]);
     }
-  }, [users]);
+  }, [customerUsers]);
 
   useEffect(() => {
     const unsub = store.subscribe(() => {
@@ -215,11 +221,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     return investments.filter((i) => i.status === investmentStatusFilter);
   }, [investments, investmentStatusFilter]);
 
-  // Search users by Account Number, Username, Email, or Full Name
+  // Search users by Account Number, Username, Email, or Full Name (customer accounts only)
   const filteredUsers = useMemo(() => {
     const clean = searchAccountInput.trim().toLowerCase();
-    if (!clean) return users;
-    return users.filter(
+    if (!clean) return customerUsers;
+    return customerUsers.filter(
       (u) =>
         u.accountNumber.includes(clean) ||
         u.email.toLowerCase().includes(clean) ||
@@ -227,7 +233,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         `${u.fullName} ${u.surname}`.toLowerCase().includes(clean) ||
         u.country.toLowerCase().includes(clean)
     );
-  }, [users, searchAccountInput]);
+  }, [customerUsers, searchAccountInput]);
 
   const selectedBankingInfo = useMemo(() => {
     if (!selectedUser) return null;
@@ -264,7 +270,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     setSuspensionConfirm(false);
     const clean = input.trim().toLowerCase();
     if (!clean) return;
-    const found = users.find(
+    const found = customerUsers.find(
       (u) =>
         u.accountNumber === clean ||
         u.email.toLowerCase() === clean ||
@@ -621,7 +627,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const pendingVerifications = verificationRequests.filter((v) => v.status === 'Pending Review');
   const activeInvestmentsCount = investments.filter((i) => i.status === 'Active').length;
   const pendingReferralsCount = referrals.filter((r) => r.status === 'Pending').length;
-  const totalCustodyAssets = users.reduce((acc, u) => acc + (u.balance || 0), 0);
+  const totalCustodyAssets = customerUsers.reduce((acc, u) => acc + (u.balance || 0), 0);
 
   return (
     <div className="min-h-screen bg-[#001020] text-white pb-20">
@@ -649,12 +655,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#00172e] border border-[#002b52] text-xs">
               <ShieldCheck className="w-4 h-4 text-emerald-400" />
               <span className="text-slate-400">Operator:</span>
               <span className="font-mono text-cyan-300 font-bold">
-                {currentAdmin?.email || 'Authorized Admin'}
+                {activeAdmin?.email || currentAdmin?.email || 'Authorized Admin'}
               </span>
             </div>
 
@@ -666,6 +672,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <Users className="w-4 h-4" />
               <span>Exit Management Portal</span>
             </button>
+
+            {onLogout && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="px-3.5 py-2 rounded-xl bg-rose-950/60 hover:bg-rose-900/70 border border-rose-800/60 text-rose-200 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Log Out</span>
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -706,7 +723,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
               Registered Customers
             </span>
-            <p className="text-2xl font-black text-white mt-1 font-mono">{users.length}</p>
+            <p className="text-2xl font-black text-white mt-1 font-mono">{customerUsers.length}</p>
           </div>
 
           <div className="p-4 rounded-xl bg-[#00172e] border border-[#002b52] shadow">

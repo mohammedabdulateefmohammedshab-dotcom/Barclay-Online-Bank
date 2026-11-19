@@ -11,13 +11,14 @@ import {
   Menu,
   X
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, AdminRoleRecord } from '../types';
 import { LANGUAGES, SupportedLanguage, TRANSLATIONS } from '../lib/languages';
 import { BrandLogo } from './BrandLogo';
 import { store } from '../lib/store';
 
 interface HeaderProps {
   currentUser: UserProfile | null;
+  activeAdmin?: AdminRoleRecord | null;
   isAdminMode: boolean;
   onOpenAuth: (mode: 'login' | 'register') => void;
   onOpenAdminAuth?: () => void;
@@ -35,6 +36,7 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
+  activeAdmin,
   isAdminMode,
   onOpenAuth,
   onLogout,
@@ -311,6 +313,26 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </div>
             </div>
+          ) : activeAdmin ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={onToggleAdminView}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 border border-cyan-400/30 text-xs font-bold text-cyan-300 transition-colors cursor-pointer whitespace-nowrap"
+              >
+                <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                <span>Management Portal</span>
+              </button>
+              <button
+                type="button"
+                onClick={onLogout}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#141824] hover:bg-rose-950/40 border border-white/10 text-xs font-semibold text-rose-300 transition-colors cursor-pointer"
+                title="Logout Administrator"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>{t.logout}</span>
+              </button>
+            </div>
           ) : (
             <button
               type="button"
@@ -359,7 +381,7 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          {(currentUser?.role === 'admin' || store.isCurrentUserAdmin()) && (
+          {(currentUser?.role === 'admin' || activeAdmin || store.isCurrentUserAdmin()) && (
             <button
               type="button"
               onClick={() => {
@@ -411,7 +433,7 @@ export const Header: React.FC<HeaderProps> = ({
             {t.contactSupport}
           </button>
 
-          {!currentUser && (
+          {!currentUser && !activeAdmin && (
             <div className="pt-3 grid grid-cols-2 gap-3 border-t border-white/[0.08]">
               <button
                 type="button"
@@ -432,6 +454,22 @@ export const Header: React.FC<HeaderProps> = ({
                 className="py-2.5 px-4 rounded-full bg-gradient-to-r from-[#2176ff] via-[#4f46e5] to-[#7c3aed] text-xs font-bold text-white text-center"
               >
                 {t.createAccount}
+              </button>
+            </div>
+          )}
+
+          {!currentUser && activeAdmin && (
+            <div className="pt-3 border-t border-white/[0.08]">
+              <button
+                type="button"
+                onClick={() => {
+                  onLogout();
+                  setMobileMenuOpen(false);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl bg-rose-950/50 border border-rose-800/50 text-xs font-bold text-rose-300 flex items-center justify-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>{t.logout} ({activeAdmin.email})</span>
               </button>
             </div>
           )}

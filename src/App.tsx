@@ -21,6 +21,7 @@ import { Header } from './components/Header';
 import { HomePage } from './components/HomePage';
 import { UserDashboard } from './components/UserDashboard';
 import { AdminDashboard } from './components/AdminDashboard';
+import { AdminLoginPage } from './components/AdminLoginPage';
 import { AuthModal } from './components/AuthModal';
 import { DepositModal } from './components/DepositModal';
 import { TransferModal } from './components/TransferModal';
@@ -34,10 +35,52 @@ import { LiveChatWidget } from './components/LiveChatWidget';
 import { testConnection } from './lib/firebase';
 import { BrandLogo } from './components/BrandLogo';
 
+function isAdminSetupUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  return (
+    path === '/admin-setup' ||
+    path === '/admin-setup/' ||
+    hash === '#admin-setup' ||
+    hash === '#/admin-setup'
+  );
+}
+
+function isAdminRouteUrl(): boolean {
+  if (typeof window === 'undefined') return false;
+  const path = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  const search = window.location.search.toLowerCase();
+  return (
+    isAdminSetupUrl() ||
+    path === '/admin' ||
+    path === '/admin/' ||
+    path === '/admin-login' ||
+    path === '/admin-login/' ||
+    hash === '#admin' ||
+    hash === '#/admin' ||
+    hash === '#admin-login' ||
+    hash === '#/admin-login' ||
+    hash === '#portal' ||
+    search.includes('admin=true')
+  );
+}
+
+function clearAdminRouteUrl() {
+  if (typeof window === 'undefined') return;
+  if (isAdminRouteUrl()) {
+    window.history.replaceState(null, '', '/');
+  }
+}
+
 export default function App() {
   const [authReady, setAuthReady] = useState<boolean>(store.isAuthReady());
   const [users, setUsers] = useState<UserProfile[]>(store.getUsers());
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(store.getCurrentUser());
+  const [activeAdmin, setActiveAdmin] = useState<AdminRoleRecord | null>(
+    store.getCurrentAdminRecord()
+  );
   const [adminTier, setAdminTier] = useState<AdminTier | null>(store.getCurrentAdminTier());
   const [admins, setAdmins] = useState<AdminRoleRecord[]>(store.getAdmins());
   const [transactions, setTransactions] = useState<BankTransaction[]>(store.getTransactions());
@@ -58,6 +101,8 @@ export default function App() {
   const [notifications, setNotifications] = useState<BankNotification[]>(store.getNotifications());
   const [settings, setSettings] = useState<FinancialSettings>(store.getSettings());
 
+  const [isAdminRoute, setIsAdminRoute] = useState<boolean>(() => isAdminRouteUrl());
+
   // Navigation & View Mode: Persistent across page refreshes
   const [activeTab, setActiveTab] = useState<'home' | 'dashboard'>(() => {
     const saved = typeof window !== 'undefined' ? sessionStorage.getItem('aegis_active_tab') : null;
@@ -69,7 +114,7 @@ export default function App() {
   const [isAdminMode, setIsAdminMode] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const savedAdmin = sessionStorage.getItem('aegis_management_active') === 'true';
-      return savedAdmin && store.isCurrentUserAdmin();
+      return (savedAdmin || isAdminRouteUrl()) && store.isCurrentUserAdmin();
     }
     return false;
   });
@@ -94,12 +139,14 @@ export default function App() {
     const syncState = () => {
       const ready = store.isAuthReady();
       const u = store.getCurrentUser();
+      const adminRec = store.getCurrentAdminRecord();
       const tier = store.getCurrentAdminTier();
-      const hasAdminAccess = store.isCurrentUserAdmin() || u?.role === 'admin';
+      const hasAdminAccess = Boolean(adminRec || store.isCurrentUserAdmin() || u?.role === 'admin');
 
       setAuthReady(ready);
       setUsers(store.getUsers());
       setCurrentUser(u);
+      setActiveAdmin(adminRec);
       setAdminTier(tier);
       setAdmins(store.getAdmins());
       setTransactions(store.getTransactions());
@@ -114,11 +161,15 @@ export default function App() {
       setNotifications(store.getNotifications());
       setSettings(store.getSettings());
 
-      if (ready && !u) {
+      if (ready && !u && !hasAdminAccess) {
         setIsAdminMode(false);
         sessionStorage.removeItem('aegis_management_active');
-      } else if (u && hasAdminAccess) {
-        if (sessionStorage.getItem('aegis_management_active') === 'true' || !sessionStorage.getItem('aegis_active_tab')) {
+      } else if (hasAdminAccess) {
+        if (
+          sessionStorage.getItem('aegis_management_active') === 'true' ||
+          isAdminRouteUrl() ||
+          !u
+        ) {
           setIsAdminMode(true);
           sessionStorage.setItem('aegis_management_active', 'true');
         }
@@ -137,31 +188,27 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // Route listener for direct admin route hash
+  // Route listener for dedicated Admin Login page (/admin, #/admin, #admin, ?admin=true)
   useEffect(() => {
     const checkAdminRoute = () => {
-      const hash = window.location.hash.toLowerCase();
-      if (
-        hash === '#admin' ||
-        hash === '#/admin' ||
-        hash === '#portal' ||
-        window.location.search.includes('admin=true')
-      ) {
+      const routeActive = isAdminRouteUrl();
+      setIsAdminRoute(routeActive);
+      if (routeActive) {
         const u = store.getCurrentUser();
-        if (u && (store.isCurrentUserAdmin() || u.role === 'admin')) {
+        const adminRec = store.getCurrentAdminRecord();
+        if (adminRec || store.isCurrentUserAdmin() || u?.role === 'admin') {
           setIsAdminMode(true);
           sessionStorage.setItem('aegis_management_active', 'true');
-        } else {
-          setAuthInitialMode('login');
-          setAuthModalOpen(true);
         }
       }
     };
 
     checkAdminRoute();
     window.addEventListener('hashchange', checkAdminRoute);
+    window.addEventListener('popstate', checkAdminRoute);
     return () => {
       window.removeEventListener('hashchange', checkAdminRoute);
+      window.removeEventListener('popstate', checkAdminRoute);
     };
   }, []);
 
@@ -198,9 +245,12 @@ export default function App() {
     sessionStorage.removeItem('aegis_management_active');
     await store.logoutUser();
     setCurrentUser(null);
+    setActiveAdmin(null);
     setAdminTier(null);
     setActiveTab('home');
     setIsAdminMode(false);
+    clearAdminRouteUrl();
+    setIsAdminRoute(false);
   };
 
   const handleTransferCreated = (tx: BankTransaction) => {
@@ -224,14 +274,44 @@ export default function App() {
   }
 
   const canAccessAdmin = Boolean(
-    currentUser && (store.isCurrentUserAdmin() || currentUser.role === 'admin')
+    activeAdmin || store.isCurrentUserAdmin() || currentUser?.role === 'admin'
   );
+
+  // Dedicated standalone Admin Login Page when accessing /admin or #/admin while unauthenticated
+  if (isAdminRoute && !canAccessAdmin) {
+    return (
+      <AdminLoginPage
+        initialView={isAdminSetupUrl() ? 'setup' : 'login'}
+        onSuccess={(adminRecord, adminUser) => {
+          if (adminRecord) setActiveAdmin(adminRecord);
+          if (adminUser) {
+            store.setCurrentUserId(adminUser.uid);
+            setCurrentUser(adminUser);
+          } else if (adminRecord) {
+            store.setCurrentUserId(adminRecord.uid);
+          }
+          setAdminTier(adminRecord?.tier || store.getCurrentAdminTier() || 'tier1');
+          setIsAdminMode(true);
+          sessionStorage.setItem('aegis_management_active', 'true');
+          sessionStorage.removeItem('aegis_active_tab');
+          window.history.replaceState(null, '', '/#/admin');
+        }}
+        onBackToSite={() => {
+          clearAdminRouteUrl();
+          setIsAdminRoute(false);
+          setIsAdminMode(false);
+          setActiveTab('home');
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0b0d13] font-sans antialiased text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
       {/* Universal Header */}
       <Header
         currentUser={currentUser}
+        activeAdmin={activeAdmin}
         isAdminMode={isAdminMode && canAccessAdmin}
         onOpenAuth={handleOpenAuth}
         onLogout={handleLogout}
@@ -248,6 +328,8 @@ export default function App() {
         onOpenSupport={() => setSupportModalOpen(true)}
         activeTab={isAdminMode && canAccessAdmin ? 'admin' : activeTab}
         onSelectTab={(tab) => {
+          clearAdminRouteUrl();
+          setIsAdminRoute(false);
           setIsAdminMode(false);
           sessionStorage.removeItem('aegis_management_active');
           setActiveTab(tab as 'home' | 'dashboard');
@@ -270,15 +352,19 @@ export default function App() {
             referrals={referrals}
             admins={admins}
             bankingInfos={bankingInfos}
-            adminTier={adminTier || currentUser?.adminTier || 'tier1'}
+            adminTier={adminTier || activeAdmin?.tier || currentUser?.adminTier || 'tier1'}
+            activeAdmin={activeAdmin}
             settings={settings}
             onViewReceipt={(tx) => setSelectedReceiptTx(tx)}
             onExitAdmin={() => {
+              clearAdminRouteUrl();
+              setIsAdminRoute(false);
               sessionStorage.removeItem('aegis_management_active');
               setIsAdminMode(false);
               setActiveTab(currentUser ? 'dashboard' : 'home');
               sessionStorage.setItem('aegis_active_tab', currentUser ? 'dashboard' : 'home');
             }}
+            onLogout={handleLogout}
           />
         ) : currentUser && activeTab === 'dashboard' ? (
           <UserDashboard
@@ -314,10 +400,16 @@ export default function App() {
         isOpen={authModalOpen}
         onClose={() => setAuthModalOpen(false)}
         initialMode={authInitialMode}
-        onSuccess={(user) => {
-          store.setCurrentUserId(user.uid);
-          setCurrentUser(user);
-          if (store.isCurrentUserAdmin() || user.role === 'admin') {
+        onSuccess={(user, adminRecord) => {
+          if (adminRecord) setActiveAdmin(adminRecord);
+          if (user) {
+            store.setCurrentUserId(user.uid);
+            setCurrentUser(user);
+          } else if (adminRecord) {
+            store.setCurrentUserId(adminRecord.uid);
+          }
+          if (adminRecord || store.isCurrentUserAdmin() || user?.role === 'admin') {
+            setAdminTier(adminRecord?.tier || store.getCurrentAdminTier() || 'tier1');
             setIsAdminMode(true);
             sessionStorage.setItem('aegis_management_active', 'true');
             sessionStorage.removeItem('aegis_active_tab');

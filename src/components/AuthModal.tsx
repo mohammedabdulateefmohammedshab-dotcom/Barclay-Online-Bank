@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { SUPPORTED_COUNTRIES } from '../lib/banksData';
 import { store } from '../lib/store';
-import { UserProfile } from '../types';
+import { UserProfile, AdminRoleRecord } from '../types';
 import { BrandLogo } from './BrandLogo';
 import confetti from 'canvas-confetti';
 
@@ -29,7 +29,7 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'login' | 'register' | 'forgot';
-  onSuccess: (user: UserProfile) => void;
+  onSuccess: (user: UserProfile | null, adminRecord?: AdminRoleRecord | null) => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({
@@ -154,10 +154,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(true);
     try {
       const result = await store.loginUser(loginIdentifier, loginSecret);
-      if (result.error || !result.user) {
+      if (result.error || (!result.user && !result.adminRecord)) {
         setErrorMessage(result.error || 'Authentication failed');
       } else {
-        onSuccess(result.user);
+        onSuccess(result.user, result.adminRecord || null);
         onClose();
       }
     } catch (err: any) {

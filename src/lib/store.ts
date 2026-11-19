@@ -20,6 +20,8 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   updatePassword,
+  GoogleAuthProvider,
+  signInWithPopup,
   User as FirebaseAuthUser,
 } from 'firebase/auth';
 import { auth, db, handleFirestoreError, OperationType } from './firebase';
@@ -106,6 +108,7 @@ class AegisStore {
 
   private currentUserId: string | null = null;
   private currentAdminTier: AdminTier | null = null;
+  private currentAdminRecord: AdminRoleRecord | null = null;
   private authReady = false;
   private registrationInProgress = false;
   private activeUnsubscribes: Unsubscribe[] = [];
@@ -130,19 +133,20 @@ class AegisStore {
         this.resetAuthenticatedCollections();
         this.currentUserId = null;
         this.currentAdminTier = null;
+        this.currentAdminRecord = null;
         this.authReady = true;
         this.notify();
         return;
       }
 
       try {
-        const profile = await this.ensureAuthenticatedUserSession(firebaseUser);
-        this.currentUserId = profile.uid;
+        const { profile, adminRecord } = await this.ensureAuthenticatedUserSession(firebaseUser);
+        this.currentUserId = profile?.uid || adminRecord?.uid || firebaseUser.uid;
         this.authReady = true;
 
         if (this.currentAdminTier) {
           this.subscribeAdminCollections();
-        } else {
+        } else if (profile) {
           this.subscribeCustomerCollections(profile);
         }
         this.notify();
@@ -235,31 +239,34 @@ class AegisStore {
   }
 
   /**
-   * Ensures an authenticated Firebase user has a valid Firestore user profile and admin tier resolved,
-   * while strictly preserving existing balances, account numbers, and histories.
+   * Ensures an authenticated Firebase user has their admin tier and/or customer profile resolved.
+   * Authorized administrators are kept in `admins/{uid}` and NEVER forced into a synthetic customer bank account.
+   * Existing customer accounts, balances, and histories are preserved intact.
    */
   private async ensureAuthenticatedUserSession(
     firebaseUser: FirebaseAuthUser
-  ): Promise<UserProfile> {
+  ): Promise<{ profile: UserProfile | null; adminRecord: AdminRoleRecord | null }> {
     const uid = firebaseUser.uid;
     const emailLower = (firebaseUser.email || '').trim().toLowerCase();
     const now = new Date().toISOString();
 
-    // 1. Check admins/{uid} first, bootstrapping primary Super Admins if authorized
+    // 1. Resolve admins/{uid}, bootstrapping Primary Super Admins if authorized
     let resolvedAdminTier: AdminTier | null = null;
+    let adminRecord: AdminRoleRecord | null = null;
     try {
       const adminSnap = await getDoc(doc(db, 'admins', uid));
       if (adminSnap.exists()) {
         const adminData = adminSnap.data() as AdminRoleRecord;
         if (adminData.status === 'active') {
           resolvedAdminTier = adminData.tier === 'tier1' ? 'tier1' : 'tier2';
+          adminRecord = { ...adminData, uid: adminData.uid || uid };
         }
       } else if (PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
         const superAdminRecord: AdminRoleRecord = {
           uid,
           email: emailLower,
           username: emailLower.split('@')[0],
-          fullName: firebaseUser.displayName || 'Super Administrator',
+          fullName: firebaseUser.displayName || 'Executive Owner Admin',
           tier: 'tier1',
           status: 'active',
           createdBy: 'system',
@@ -268,16 +275,30 @@ class AegisStore {
         };
         await setDoc(doc(db, 'admins', uid), superAdminRecord);
         resolvedAdminTier = 'tier1';
+        adminRecord = superAdminRecord;
       }
     } catch (e) {
       if (PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
         resolvedAdminTier = 'tier1';
+        adminRecord = {
+          uid,
+          email: emailLower,
+          username: emailLower.split('@')[0],
+          fullName: firebaseUser.displayName || 'Executive Owner Admin',
+          tier: 'tier1',
+          status: 'active',
+          createdBy: 'system',
+          createdAt: now,
+          updatedAt: now,
+        };
       }
       console.warn('Admin role lookup notice:', e);
     }
-    this.currentAdminTier = resolvedAdminTier;
 
-    // 2. Load users/{uid} or migrate legacy Firestore doc matching email without losing balances
+    this.currentAdminTier = resolvedAdminTier;
+    this.currentAdminRecord = adminRecord;
+
+    // 2. Load users/{uid} if it exists
     const userRef = doc(db, 'users', uid);
     const userSnap = await getDoc(userRef);
 
@@ -285,28 +306,8 @@ class AegisStore {
 
     if (userSnap.exists()) {
       profile = userSnap.data() as UserProfile;
-      // Synchronize admin role metadata if admin clearance was granted
-      if (resolvedAdminTier && (profile.role !== 'admin' || profile.adminTier !== resolvedAdminTier)) {
-        profile = {
-          ...profile,
-          role: 'admin',
-          adminTier: resolvedAdminTier,
-          updatedAt: now,
-        };
-        if (PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
-          try {
-            await updateDoc(userRef, {
-              role: 'admin',
-              adminTier: resolvedAdminTier,
-              updatedAt: now,
-            });
-          } catch {
-            // Rules might block non-admin role field writes; admins/{uid} remains authoritative
-          }
-        }
-      }
-    } else {
-      // Check if a pre-auth profile exists by email
+    } else if (!resolvedAdminTier) {
+      // Non-admin customer: check pre-auth legacy profile matching email
       try {
         const emailQ = query(
           collection(db, 'users'),
@@ -320,8 +321,7 @@ class AegisStore {
             ...legacyData,
             uid,
             email: emailLower,
-            role: resolvedAdminTier ? 'admin' : legacyData.role || 'user',
-            ...(resolvedAdminTier ? { adminTier: resolvedAdminTier } : {}),
+            role: legacyData.role || 'user',
             updatedAt: now,
           };
           await setDoc(userRef, profile);
@@ -342,7 +342,8 @@ class AegisStore {
       }
     }
 
-    if (!profile) {
+    // Only create a new customer profile in `users` if this is a standard customer without an admin record
+    if (!profile && !resolvedAdminTier) {
       const accountNumber = await this.generateUniqueAccountNumberInFirestore();
       const displayParts = (firebaseUser.displayName || emailLower.split('@')[0] || 'Client').split(' ');
       const firstName = displayParts[0] || 'Client';
@@ -363,8 +364,7 @@ class AegisStore {
         currency: 'USD',
         tier: 'Tier 1',
         status: 'active',
-        role: resolvedAdminTier ? 'admin' : 'user',
-        ...(resolvedAdminTier ? { adminTier: resolvedAdminTier } : {}),
+        role: 'user',
         referralCode: `AEG-${accountNumber.slice(-6)}`,
         createdAt: now,
         updatedAt: now,
@@ -392,15 +392,16 @@ class AegisStore {
       });
     }
 
-    // Update active local users array
-    const existingIdx = this.users.findIndex((u) => u.uid === profile!.uid);
-    if (existingIdx >= 0) {
-      this.users[existingIdx] = profile;
-    } else {
-      this.users.unshift(profile);
+    if (profile) {
+      const existingIdx = this.users.findIndex((u) => u.uid === profile!.uid);
+      if (existingIdx >= 0) {
+        this.users[existingIdx] = profile;
+      } else {
+        this.users.unshift(profile);
+      }
     }
 
-    return profile;
+    return { profile, adminRecord };
   }
 
   private subscribeAdminCollections() {
@@ -595,6 +596,10 @@ class AegisStore {
     return this.users.find((u) => u.uid === this.currentUserId) || null;
   }
 
+  public getCurrentAdminRecord(): AdminRoleRecord | null {
+    return this.currentAdminRecord;
+  }
+
   public getCurrentAdminTier(): AdminTier | null {
     return this.currentAdminTier;
   }
@@ -705,6 +710,7 @@ class AegisStore {
     this.resetAuthenticatedCollections();
     this.currentUserId = null;
     this.currentAdminTier = null;
+    this.currentAdminRecord = null;
     try {
       await signOut(auth);
     } catch (err) {
@@ -715,15 +721,17 @@ class AegisStore {
 
   // ==================== IMMUTABLE ADMIN ACTIVITY LOGS ====================
   private getActorMetadata() {
+    const adminRec = this.currentAdminRecord;
     const currentUser = this.getCurrentUser();
     const firebaseUser = auth.currentUser;
     return {
-      adminId: firebaseUser?.uid || currentUser?.uid || 'system',
-      adminEmail: firebaseUser?.email || currentUser?.email || 'system',
+      adminId: adminRec?.uid || firebaseUser?.uid || currentUser?.uid || 'system',
+      adminEmail: adminRec?.email || firebaseUser?.email || currentUser?.email || 'system',
       adminUsername:
+        adminRec?.username ||
         currentUser?.username ||
         (firebaseUser?.email ? firebaseUser.email.split('@')[0] : 'system'),
-      adminTier: (this.currentAdminTier || 'system') as AdminTier | 'system',
+      adminTier: (adminRec?.tier || this.currentAdminTier || 'system') as AdminTier | 'system',
     };
   }
 
@@ -1041,7 +1049,7 @@ class AegisStore {
   public async loginUser(
     identifier: string,
     secret: string
-  ): Promise<{ user: UserProfile | null; error?: string }> {
+  ): Promise<{ user: UserProfile | null; adminRecord?: AdminRoleRecord | null; error?: string }> {
     const trimmed = identifier.trim();
     const cleanSecret = secret.trim();
 
@@ -1060,53 +1068,178 @@ class AegisStore {
       }
 
       const cred = await signInWithEmailAndPassword(auth, resolvedEmail, cleanSecret);
-      const profile = await this.ensureAuthenticatedUserSession(cred.user);
+      const { profile, adminRecord } = await this.ensureAuthenticatedUserSession(cred.user);
 
-      this.currentUserId = profile.uid;
+      this.currentUserId = profile?.uid || adminRecord?.uid || cred.user.uid;
       this.authReady = true;
       this.clearUserSubscriptions();
       if (this.currentAdminTier) {
         this.subscribeAdminCollections();
         await this.addAuditLog({
-          adminEmail: profile.email,
+          adminEmail: adminRecord?.email || cred.user.email || resolvedEmail,
           action: 'MANAGEMENT_LOGIN',
           details: `${this.currentAdminTier.toUpperCase()} administrator authenticated.`,
         });
-      } else {
+      } else if (profile) {
         this.subscribeCustomerCollections(profile);
       }
 
       this.notify();
-      return { user: profile };
+      return { user: profile, adminRecord };
     } catch (err: any) {
-      let msg = 'Invalid credentials. Please verify your email/account number and password.';
+      let msg = 'Invalid credentials. Please verify your identifier and password.';
       if (err?.code === 'auth/too-many-requests') {
         msg = 'Too many failed login attempts. Please wait a moment or reset your password.';
-      } else if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') {
-        msg = 'Incorrect password. Please try again or use Password Recovery.';
-      } else if (err?.code === 'auth/user-not-found') {
-        msg = 'No authentication record found for this account.';
+      } else if (
+        err?.code === 'auth/invalid-credential' ||
+        err?.code === 'auth/wrong-password' ||
+        err?.code === 'auth/user-not-found'
+      ) {
+        msg =
+          'Invalid email or password, or your administrator password has not been set up yet.';
       }
       return { user: null, error: msg };
     }
   }
 
+  /**
+   * Dedicated Administrator Portal login (supports pure executive admins with no customer bank account).
+   */
   public async verifyAdminLogin(
-    identifier: string,
-    passkey: string
-  ): Promise<{ adminUser: UserProfile | null; error?: string }> {
-    const res = await this.loginUser(identifier, passkey);
-    if (res.error || !res.user) {
-      return { adminUser: null, error: res.error };
+    emailOrId: string,
+    password: string
+  ): Promise<{ adminRecord?: AdminRoleRecord | null; adminUser?: UserProfile | null; error?: string }> {
+    const res = await this.loginUser(emailOrId, password);
+    if (res.error) {
+      return { error: res.error };
     }
-    if (!this.isCurrentUserAdmin() && res.user.role !== 'admin') {
+    if (!this.isCurrentUserAdmin()) {
       await this.logoutUser();
       return {
-        adminUser: null,
-        error: 'Access Denied: Insufficient administrative clearance level.',
+        error: 'Access Denied: This login gateway is restricted exclusively to authorized Aegis administrators.',
       };
     }
-    return { adminUser: res.user };
+    return {
+      adminRecord: res.adminRecord || this.currentAdminRecord,
+      adminUser: res.user,
+    };
+  }
+
+  /**
+   * Dedicated First-Time Owner Super Admin setup: creates Firebase Auth password credentials and
+   * activates a separate Tier 1 Admin role in `admins/{uid}` WITHOUT creating any customer bank record.
+   */
+  public async setupOwnerAdminAccount(params: {
+    email: string;
+    password: string;
+    fullName?: string;
+  }): Promise<{ adminRecord?: AdminRoleRecord; error?: string; code?: string }> {
+    const emailLower = params.email.trim().toLowerCase();
+    if (!PRIMARY_SUPER_ADMIN_EMAILS.includes(emailLower)) {
+      return {
+        error: 'Access Denied: Only pre-authorized platform owner emails can initialize Tier 1 Super Admin credentials.',
+      };
+    }
+    if (!params.password || params.password.length < 8) {
+      return { error: 'Administrator password must be at least 8 characters long.' };
+    }
+
+    this.registrationInProgress = true;
+    try {
+      const cred = await createUserWithEmailAndPassword(auth, emailLower, params.password);
+      const uid = cred.user.uid;
+      const now = new Date().toISOString();
+      const fullName = params.fullName?.trim() || 'Executive Owner Administrator';
+
+      await updateProfile(cred.user, { displayName: fullName }).catch(() => {});
+
+      const superAdminRecord: AdminRoleRecord = {
+        uid,
+        email: emailLower,
+        username: emailLower.split('@')[0],
+        fullName,
+        tier: 'tier1',
+        status: 'active',
+        createdBy: 'system',
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      await setDoc(doc(db, 'admins', uid), superAdminRecord);
+
+      this.currentAdminTier = 'tier1';
+      this.currentAdminRecord = superAdminRecord;
+      this.currentUserId = uid;
+      this.authReady = true;
+      this.clearUserSubscriptions();
+      this.subscribeAdminCollections();
+
+      await this.addAuditLog({
+        adminId: uid,
+        adminEmail: emailLower,
+        adminUsername: superAdminRecord.username,
+        adminTier: 'tier1',
+        action: 'MANAGEMENT_LOGIN',
+        details: 'Primary Tier 1 Super Administrator initialized executive credentials and signed in.',
+      });
+
+      this.notify();
+      return { adminRecord: superAdminRecord };
+    } catch (err: any) {
+      if (err?.code === 'auth/email-already-in-use') {
+        return {
+          code: 'EMAIL_EXISTS',
+          error:
+            'Credentials already exist for this administrator email. Sign in with your password, use Google Sign-In, or use Reset Admin Password.',
+        };
+      }
+      return { error: err?.message || 'Failed to initialize administrator credentials.' };
+    } finally {
+      this.registrationInProgress = false;
+    }
+  }
+
+  /**
+   * Sign into the Management Portal using Google Authentication (only succeeds for authorized admin emails/records).
+   */
+  public async loginWithGoogleAdmin(): Promise<{
+    adminRecord?: AdminRoleRecord | null;
+    adminUser?: UserProfile | null;
+    error?: string;
+  }> {
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const cred = await signInWithPopup(auth, provider);
+      const { profile, adminRecord } = await this.ensureAuthenticatedUserSession(cred.user);
+
+      if (!this.isCurrentUserAdmin()) {
+        await this.logoutUser();
+        return {
+          error:
+            'Access Denied: The selected Google account is not registered as an authorized Aegis administrator.',
+        };
+      }
+
+      this.currentUserId = profile?.uid || adminRecord?.uid || cred.user.uid;
+      this.authReady = true;
+      this.clearUserSubscriptions();
+      this.subscribeAdminCollections();
+
+      await this.addAuditLog({
+        adminEmail: adminRecord?.email || cred.user.email || 'admin',
+        action: 'MANAGEMENT_LOGIN',
+        details: `${this.currentAdminTier?.toUpperCase()} administrator signed in via Google SSO.`,
+      });
+
+      this.notify();
+      return { adminRecord, adminUser: profile };
+    } catch (err: any) {
+      if (err?.code === 'auth/popup-closed-by-user') {
+        return { error: 'Google sign-in window was closed before completing authentication.' };
+      }
+      return { error: err?.message || 'Google administrator sign-in failed.' };
+    }
   }
 
   public async recoverPassword(
